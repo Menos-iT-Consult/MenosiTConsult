@@ -1,0 +1,10 @@
+@import "./styles/base.css";
+@import "./styles/home.css";
+@import "./styles/about.css";
+@import "./styles/services.css";
+@import "./styles/portfolio.css";
+@import "./styles/testimonials.css";
+@import "./styles/blog.css";
+@import "./styles/contact.css";
+@import "./styles/legal.css";
+@import "./styles/page-transition.css";
