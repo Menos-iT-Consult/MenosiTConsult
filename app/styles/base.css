@@ -5,11 +5,11 @@
    ───────────────────────────────────────────── */
 
 :root {
-  --blue:     #1a56db;
-  --blue-d:   #1344b5;
-  --blue-l:   #3b82f6;
-  --blue-bg:  #eff6ff;
-  --blue-mid: #dbeafe;
+  --blue:     #0077b6;
+  --blue-d:   #005b8c;
+  --blue-l:   #00a1fc;
+  --blue-bg:  #eaf7fe;
+  --blue-mid: #b8e6fc;
   --dark:     #0f172a;
   --dark-2:   #1e293b;
   --body:     #334155;
@@ -86,16 +86,16 @@ ul { list-style: none; }
 }
 .btn-primary {
   background: var(--blue); color: #fff;
-  box-shadow: 0 4px 14px rgba(26,86,219,.35);
+  box-shadow: 0 4px 14px rgba(0,119,182,.35);
 }
-.btn-primary:hover { background: var(--blue-d); box-shadow: 0 6px 20px rgba(26,86,219,.45); transform: translateY(-1px); }
+.btn-primary:hover { background: var(--blue-d); box-shadow: 0 6px 20px rgba(0,119,182,.45); transform: translateY(-1px); }
 .btn-sm { padding: 9px 20px; font-size: .83rem; }
 .btn-ghost  { background: transparent; color: var(--dark); border: 1.5px solid var(--border); }
 .btn-ghost:hover { border-color: var(--blue-l); color: var(--blue); }
 .btn-nav {
   background: var(--blue); color: #fff; padding: 10px 22px;
   border-radius: 7px; font-size: .88rem;
-  box-shadow: 0 2px 8px rgba(26,86,219,.3);
+  box-shadow: 0 2px 8px rgba(0,119,182,.3);
 }
 .btn-nav:hover { background: var(--blue-d); transform: translateY(-1px); }
 .btn-full  { width: 100%; justify-content: center; }
@@ -129,10 +129,10 @@ ul { list-style: none; }
   color: #fff; font-size: 1.1rem; font-weight: 900;
   display: grid; place-items: center; flex-shrink: 0;
 }
-/* Real logo asset (assets/logo.jpg) used in .logo lockups and preloaders */
+/* Full brand logo asset used in .logo lockups and preloaders */
 .logo-img {
-  width: 36px; height: 36px; border-radius: 50%;
-  display: block; flex-shrink: 0;
+  width: 44px; height: 44px; border-radius: 6px;
+  display: block; flex-shrink: 0; object-fit: cover; background: #000;
 }
 .nav-links { display: flex; gap: 32px; margin-left: auto; }
 .nav-links a {
@@ -261,7 +261,7 @@ ul { list-style: none; }
 .form-group input:focus,
 .form-group select:focus,
 .form-group textarea:focus {
-  border-color: var(--blue); box-shadow: 0 0 0 3px rgba(26,86,219,.1);
+  border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,119,182,.1);
 }
 .form-group textarea { resize: vertical; min-height: 100px; }
 .form-success {
@@ -304,7 +304,7 @@ ul { list-style: none; }
 .pillar { background: var(--blue-bg); border: 1px solid var(--blue-mid); border-radius: 14px; padding: 20px 18px; }
 .pillar-icon {
   width: 40px; height: 40px; border-radius: 10px; margin-bottom: 12px;
-  background: rgba(26,86,219,.12); color: var(--blue); display: grid; place-items: center;
+  background: rgba(0,119,182,.12); color: var(--blue); display: grid; place-items: center;
 }
 .pillar-icon svg    { width: 20px; height: 20px; }
 .pillar h4          { font-size: .95rem; font-weight: 700; color: var(--dark); margin-bottom: 6px; }
@@ -323,7 +323,7 @@ ul { list-style: none; }
   background: linear-gradient(90deg, var(--blue), var(--blue-l));
   transform: scaleX(0); transform-origin: left; transition: transform .4s var(--ease-out);
 }
-.service-card:hover             { transform: translateY(-6px); box-shadow: 0 16px 40px rgba(26,86,219,.12); border-color: var(--blue-mid); }
+.service-card:hover             { transform: translateY(-6px); box-shadow: 0 16px 40px rgba(0,119,182,.12); border-color: var(--blue-mid); }
 .service-card:hover::before     { transform: scaleX(1); }
 .sc-icon {
   width: 52px; height: 52px; border-radius: 13px;

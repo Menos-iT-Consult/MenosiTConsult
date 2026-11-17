@@ -52,7 +52,7 @@ router.post('/', async (req, res) => {
         html: `
           <div style="font-family:Inter,system-ui,sans-serif;max-width:480px;color:#0f172a">
             <p style="margin:0 0 12px">A new visitor subscribed to the Menos iT newsletter:</p>
-            <p style="background:#eff6ff;border-radius:8px;padding:14px 18px;margin:0;font-weight:600;color:#1a56db">${email}</p>
+            <p style="background:#eaf7fe;border-radius:8px;padding:14px 18px;margin:0;font-weight:600;color:#0077b6">${email}</p>
             <p style="font-size:13px;color:#94a3b8;margin:16px 0 0">Total subscribers: ${total}</p>
           </div>`,
       });

@@ -149,7 +149,7 @@ export default function AdminApp() {
       <div id="dashboard-shell">
         <aside className={sidebarOpen ? 'sidebar open' : 'sidebar'}>
           <div className="sidebar-brand">
-            <img src="/assets/logo.jpg" alt="" style={{ width: '28px', height: '28px', borderRadius: '50%' }} />
+            <img src="/assets/logo-black.png" alt="" style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'cover' }} />
             <span className="brand-text">Menos iT Admin</span>
           </div>
           <nav className="sidebar-nav">
@@ -265,7 +265,7 @@ function InlineLogin({ onSuccess }) {
     <div id="login-screen">
       <div className="login-box">
         <div className="login-logo">
-          <img src="/assets/logo.jpg" alt="Menos iT Consult logo" style={{ width: '54px', height: '54px', margin: '0 auto 12px', display: 'block' }} />
+          <img src="/assets/logo-black.png" alt="Menos iT Consult logo" style={{ width: '64px', height: '64px', margin: '0 auto 12px', borderRadius: '8px', display: 'block' }} />
           <h1>Menos iT Consult</h1>
           <p>Admin Dashboard</p>
         </div>

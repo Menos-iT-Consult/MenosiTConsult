@@ -13,16 +13,16 @@ export const metadata = {
     siteName: 'Menos iT Consult',
     images: [
       {
-        url: '/assets/og-image.png',
-        width: 1200,
-        height: 630,
+        url: '/assets/logo-black.png',
+        width: 1254,
+        height: 1254,
         alt: 'Menos iT Consult logo',
       },
     ],
   },
   twitter: {
-    card: 'summary_large_image',
-    images: ['/assets/og-image.png'],
+    card: 'summary',
+    images: ['/assets/logo-black.png'],
   },
   icons: {
     icon: [

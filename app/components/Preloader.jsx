@@ -16,7 +16,7 @@ export default function Preloader() {
       <div className="pl-logo">
         <img
           className="logo-img"
-          src="/assets/logo.jpg"
+          src="/assets/logo-black.png"
           alt=""
           style={{ width: 48, height: 48 }}
         />

@@ -75,9 +75,9 @@ function customerEmail(sub, ctx) {
   const html = `
   <div style="font-family:Inter,system-ui,Segoe UI,sans-serif;max-width:600px;margin:0 auto;color:#0f172a;background:#f1f5f9;padding:24px 12px">
     <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e2e8f0">
-      <div style="background:linear-gradient(135deg,#1a56db,#1e3a8a);padding:30px 32px;text-align:center">
-        <img src="${SITE_URL}/assets/logo.jpg" alt="Menos iT Consult" width="64" height="64" style="width:64px;height:64px;border-radius:50%;border:3px solid rgba(255,255,255,.35);display:inline-block"/>
-        <p style="color:#ffffff;margin:12px 0 0;font-size:19px;font-weight:700;letter-spacing:.2px">Menos <span style="color:#93c5fd">iT</span> Consult</p>
+      <div style="background:linear-gradient(135deg,#0077b6,#005b8c);padding:30px 32px;text-align:center">
+        <img src="${SITE_URL}/assets/logo-black.png" alt="Menos iT Consult" width="64" height="64" style="width:64px;height:64px;border-radius:8px;border:3px solid rgba(255,255,255,.35);display:inline-block"/>
+        <p style="color:#ffffff;margin:12px 0 0;font-size:19px;font-weight:700;letter-spacing:.2px">Menos <span style="color:#b8e6fc">iT</span> Consult</p>
       </div>
       <div style="padding:32px">
         <h2 style="margin:0 0 10px;font-size:21px">Thanks, ${firstName}! 👋</h2>
@@ -88,7 +88,7 @@ function customerEmail(sub, ctx) {
         <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:18px 20px">
           <table style="width:100%;border-collapse:collapse">
             ${row('Name', esc(sub.name))}
-            ${row('Email', `<a href="mailto:${esc(sub.email)}" style="color:#1a56db">${esc(sub.email)}</a>`)}
+            ${row('Email', `<a href="mailto:${esc(sub.email)}" style="color:#0077b6">${esc(sub.email)}</a>`)}
             ${sub.phone ? row('Phone', esc(sub.phone)) : ''}
             ${sub.service ? row('Service', esc(sub.service)) : ''}
           </table>
@@ -103,13 +103,13 @@ function customerEmail(sub, ctx) {
           ${wa ? '<li>Need us sooner? Chat with us on WhatsApp below.</li>' : ''}
         </ol>
         ${wa ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:26px auto 4px"><tr>
-          <td bgcolor="#1a56db" style="border-radius:8px">
+          <td bgcolor="#0077b6" style="border-radius:8px">
             <a href="${wa}" style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px">Chat on WhatsApp</a>
           </td>
         </tr></table>` : ''}
         <p style="margin:26px 0 0;font-size:13px;color:#94a3b8;text-align:center">
           Didn't submit this form? You can ignore this email — or
-          <a href="mailto:${esc(ctx.email || process.env.SMTP_USER || '')}" style="color:#1a56db">let us know</a>.
+          <a href="mailto:${esc(ctx.email || process.env.SMTP_USER || '')}" style="color:#0077b6">let us know</a>.
         </p>
       </div>
       <div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:18px 32px;text-align:center">
@@ -144,14 +144,14 @@ function adminEmail(sub) {
   const subject = `New enquiry from ${sub.name}`;
   const html = `
   <div style="font-family:Inter,system-ui,sans-serif;max-width:600px;margin:0 auto;color:#0f172a">
-    <div style="background:#1a56db;padding:28px 32px;border-radius:12px 12px 0 0">
+    <div style="background:#0077b6;padding:28px 32px;border-radius:12px 12px 0 0">
       <h2 style="color:#fff;margin:0;font-size:20px">New Contact Form Submission</h2>
-      <p style="color:#93c5fd;margin:4px 0 0;font-size:14px">Menos iT Consult Website</p>
+      <p style="color:#b8e6fc;margin:4px 0 0;font-size:14px">Menos iT Consult Website</p>
     </div>
     <div style="background:#f8fafc;padding:32px;border-radius:0 0 12px 12px;border:1px solid #e2e8f0;border-top:none">
       <table style="width:100%;border-collapse:collapse">
         ${row('Name', esc(sub.name))}
-        ${row('Email', `<a href="mailto:${esc(sub.email)}" style="color:#1a56db">${esc(sub.email)}</a>`)}
+        ${row('Email', `<a href="mailto:${esc(sub.email)}" style="color:#0077b6">${esc(sub.email)}</a>`)}
         ${sub.phone ? row('Phone', esc(sub.phone)) : ''}
         ${sub.service ? row('Service', esc(sub.service)) : ''}
         ${sub.source ? row('Found us via', esc(sub.source)) : ''}
@@ -239,20 +239,20 @@ function tipEmail({ subject, message }, ctx) {
   const contactLine = [
     ctx.email ? `&#9993; ${esc(ctx.email)}` : '',
     ctx.phone ? `&nbsp;&middot;&nbsp; ${esc(ctx.phone)}` : '',
-    wa ? `&nbsp;&middot;&nbsp; <a href="${wa}" style="color:#1a56db">WhatsApp us</a>` : '',
+    wa ? `&nbsp;&middot;&nbsp; <a href="${wa}" style="color:#0077b6">WhatsApp us</a>` : '',
   ].filter(Boolean).join(' ');
   const html = `
   <div style="font-family:Inter,system-ui,Segoe UI,sans-serif;max-width:600px;margin:0 auto;color:#0f172a;background:#f1f5f9;padding:24px 12px">
     <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e2e8f0">
-      <div style="background:linear-gradient(135deg,#1a56db,#1e3a8a);padding:30px 32px;text-align:center">
-        <img src="${SITE_URL}/assets/logo.jpg" alt="Menos iT Consult" width="64" height="64" style="border-radius:50%;display:block;margin:0 auto 10px"/>
+      <div style="background:linear-gradient(135deg,#0077b6,#005b8c);padding:30px 32px;text-align:center">
+        <img src="${SITE_URL}/assets/logo-black.png" alt="Menos iT Consult" width="64" height="64" style="width:64px;height:64px;border-radius:8px;display:block;margin:0 auto 10px"/>
         <h1 style="color:#fff;margin:0;font-size:20px">IT Tip &mdash; Menos iT Consult</h1>
-        <p style="color:#93c5fd;margin:6px 0 0;font-size:13px">Practical tech advice for your business</p>
+        <p style="color:#b8e6fc;margin:6px 0 0;font-size:13px">Practical tech advice for your business</p>
       </div>
       <div style="padding:32px">
         <h2 style="margin:0 0 18px;font-size:19px;color:#0f172a">${esc(subject)}</h2>
         ${paragraphs}
-        <a href="${SITE_URL}" style="display:inline-block;background:#1a56db;color:#fff;text-decoration:none;padding:12px 26px;border-radius:10px;font-weight:600;font-size:14px;margin-top:6px">Visit Menos iT Consult</a>
+        <a href="${SITE_URL}" style="display:inline-block;background:#0077b6;color:#fff;text-decoration:none;padding:12px 26px;border-radius:10px;font-weight:600;font-size:14px;margin-top:6px">Visit Menos iT Consult</a>
       </div>
       <div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:18px 32px;font-size:12px;color:#94a3b8">
         <p style="margin:0 0 6px">Need help implementing this tip? We're one message away.</p>
@@ -357,9 +357,9 @@ function welcomeEmail(sub) {
   const html = `
     <div style="font-family:Inter,system-ui,Segoe UI,sans-serif;max-width:600px;margin:0 auto;color:#0f172a;background:#f1f5f9;padding:24px 12px">
       <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e2e8f0">
-        <div style="background:linear-gradient(135deg,#1a56db,#1e3a8a);padding:30px 32px;text-align:center">
-          <img src="${SITE_URL}/assets/logo.jpg" alt="Menos iT Consult" width="64" height="64" style="width:64px;height:64px;border-radius:50%;border:3px solid rgba(255,255,255,.35);display:inline-block"/>
-          <p style="color:#ffffff;margin:12px 0 0;font-size:19px;font-weight:700;letter-spacing:.2px">Menos <span style="color:#93c5fd">iT</span> Consult</p>
+        <div style="background:linear-gradient(135deg,#0077b6,#005b8c);padding:30px 32px;text-align:center">
+          <img src="${SITE_URL}/assets/logo-black.png" alt="Menos iT Consult" width="64" height="64" style="width:64px;height:64px;border-radius:8px;border:3px solid rgba(255,255,255,.35);display:inline-block"/>
+          <p style="color:#ffffff;margin:12px 0 0;font-size:19px;font-weight:700;letter-spacing:.2px">Menos <span style="color:#b8e6fc">iT</span> Consult</p>
         </div>
         <div style="padding:32px">
           <h2 style="margin:0 0 10px;font-size:21px">${firstName ? `Welcome aboard, ${firstName}! 👋` : 'Thanks for subscribing!'}</h2>
@@ -376,7 +376,7 @@ function welcomeEmail(sub) {
             <li>Real, actionable tips (not jargon-filled marketing).</li>
             <li>No third-party sharing of your email address.</li>
           </ul>
-          <a href="${SITE_URL}/blog" style="display:inline-block;background:#1a56db;color:#fff;text-decoration:none;padding:12px 26px;border-radius:10px;font-weight:600;font-size:14px">Browse the blog</a>
+          <a href="${SITE_URL}/blog" style="display:inline-block;background:#0077b6;color:#fff;text-decoration:none;padding:12px 26px;border-radius:10px;font-weight:600;font-size:14px">Browse the blog</a>
         </div>
         <div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:18px 32px;text-align:center">
           <p style="margin:0;font-size:12px;color:#94a3b8">

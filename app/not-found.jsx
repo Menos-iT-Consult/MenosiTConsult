@@ -27,7 +27,7 @@ export default function NotFound() {
           width: 80px; height: 80px; border-radius: 20px; margin: 0 auto 28px;
           background: linear-gradient(135deg, var(--blue), var(--blue-l));
           display: grid; place-items: center; position: relative; z-index: 1;
-          box-shadow: 0 12px 32px rgba(26,86,219,.3);
+          box-shadow: 0 12px 32px rgba(0,119,182,.3);
         }
         .err-icon svg   { width: 38px; height: 38px; color: #fff; }
         .err-wrap h1    { font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 800; color: var(--dark); margin-bottom: 14px; position: relative; }
@@ -38,7 +38,7 @@ export default function NotFound() {
           background: #fff; border: 1px solid var(--border); border-radius: 14px;
           padding: 20px; text-align: left; transition: transform .3s, box-shadow .3s, border-color .3s;
         }
-        .err-card:hover { transform: translateY(-4px); box-shadow: 0 10px 28px rgba(26,86,219,.1); border-color: var(--blue-mid); }
+        .err-card:hover { transform: translateY(-4px); box-shadow: 0 10px 28px rgba(0,119,182,.1); border-color: var(--blue-mid); }
         .err-card svg   { width: 22px; height: 22px; color: var(--blue); margin-bottom: 10px; display: block; }
         .err-card strong { font-size: .88rem; color: var(--dark); display: block; margin-bottom: 4px; }
         .err-card span  { font-size: .78rem; color: var(--muted); }

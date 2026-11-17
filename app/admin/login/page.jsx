@@ -57,7 +57,7 @@ export default function AdminLoginPage() {
     <div id="login-screen">
       <div className="login-box">
         <div className="login-logo">
-          <img className="login-mark" src="/assets/logo.jpg" alt="Menos iT Consult logo" aria-hidden="true" />
+          <img className="login-mark" src="/assets/logo-black.png" alt="Menos iT Consult logo" aria-hidden="true" />
           <h1>Menos iT Consult</h1>
           <p>Admin Dashboard — Sign in</p>
         </div>

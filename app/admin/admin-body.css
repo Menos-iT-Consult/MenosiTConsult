@@ -19,8 +19,8 @@ body:has(> .admin-root) {
   --sidebar-text: #94a3b8;
   --sidebar-text-active: #fff;
   --sidebar-hover-bg: rgba(255,255,255,0.06);
-  --sidebar-active-bg: rgba(26,86,219,0.3);
-  --sidebar-active-border: #1a56db;
+  --sidebar-active-bg: rgba(0,119,182,0.3);
+  --sidebar-active-border: #0077b6;
 
   --topbar-h: 60px;
   --topbar-bg: #fff;
@@ -34,8 +34,8 @@ body:has(> .admin-root) {
   --text-muted: #64748b;
   --text-light: #94a3b8;
 
-  --blue: #1a56db;
-  --blue-light: #eff6ff;
+  --blue: #0077b6;
+  --blue-light: #eaf7fe;
   --green: #059669;
   --green-light: #ecfdf5;
   --orange: #d97706;

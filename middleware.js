@@ -81,25 +81,63 @@ async function verifySignedCookie(raw, secret) {
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
+  const secret = process.env.SESSION_SECRET || '';
 
+  // ── Academy Admin (MITA staff) ────────────────────────────────────────────
+  // Gated with its own signed cookie (academy_staff). Public route: the login
+  // page itself.
+  if (pathname === '/academy/admin/login') {
+    return NextResponse.next();
+  }
+  if (pathname === '/academy/admin' || pathname.startsWith('/academy/admin/')) {
+    const valid = await signedCookieValid(request, 'academy_staff', secret);
+    if (valid) return NextResponse.next();
+    return redirect(request, '/academy/admin/login');
+  }
+
+  // ── Academy student portal ────────────────────────────────────────────────
+  // Gated with its own signed cookie (academy_student). Public routes: the
+  // landing page and the login/register pages.
+  if (
+    pathname === '/academy/login' ||
+    pathname === '/academy/register' ||
+    pathname === '/academy'
+  ) {
+    return NextResponse.next();
+  }
+  if (pathname === '/academy' || pathname.startsWith('/academy/')) {
+    const valid = await signedCookieValid(request, 'academy_student', secret);
+    if (valid) return NextResponse.next();
+    return redirect(request, '/academy/login');
+  }
+
+  // ── Site admin (existing gate, unchanged) ─────────────────────────────────
   if (pathname === '/admin/login') {
     return NextResponse.next();
   }
 
-  const raw = request.cookies.get(COOKIE_NAME)?.value || '';
-  const secret = process.env.SESSION_SECRET || '';
-  const valid = raw ? await verifySignedCookie(raw, secret) : false;
+  const valid = await signedCookieValid(request, COOKIE_NAME, secret);
 
   if (valid) {
     return NextResponse.next();
   }
 
+  return redirect(request, '/admin/login');
+}
+
+async function signedCookieValid(request, name, secret) {
+  const raw = request.cookies.get(name)?.value || '';
+  if (!raw) return false;
+  return verifySignedCookie(raw, secret);
+}
+
+function redirect(request, path) {
   const url = request.nextUrl.clone();
-  url.pathname = '/admin/login';
+  url.pathname = path;
   url.search = '';
   return NextResponse.redirect(url);
 }
 
 export const config = {
-  matcher: ['/admin', '/admin/:path*'],
+  matcher: ['/admin', '/admin/:path*', '/academy/:path*'],
 };

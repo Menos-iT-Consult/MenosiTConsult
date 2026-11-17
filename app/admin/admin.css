@@ -7,8 +7,8 @@
   --sidebar-text: #94a3b8;
   --sidebar-text-active: #fff;
   --sidebar-hover-bg: rgba(255,255,255,0.06);
-  --sidebar-active-bg: rgba(26,86,219,0.3);
-  --sidebar-active-border: #1a56db;
+  --sidebar-active-bg: rgba(0,119,182,0.3);
+  --sidebar-active-border: #0077b6;
 
   --topbar-h: 60px;
   --topbar-bg: #fff;
@@ -22,8 +22,8 @@
   --text-muted: #64748b;
   --text-light: #94a3b8;
 
-  --blue: #1a56db;
-  --blue-light: #eff6ff;
+  --blue: #0077b6;
+  --blue-light: #eaf7fe;
   --green: #059669;
   --green-light: #ecfdf5;
   --orange: #d97706;
@@ -81,7 +81,7 @@ h1, h2, h3, h4 { font-weight: 600; line-height: 1.3; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1a56db 100%);
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0077b6 100%);
   padding: 24px;
 }
 
@@ -180,9 +180,11 @@ h1, h2, h3, h4 { font-weight: 600; line-height: 1.3; }
 }
 /* Logo image inside the standalone login page mark */
 .login-mark {
-  width: 54px; height: 54px; margin: 0 auto 16px;
+  width: 64px; height: 64px; margin: 0 auto 16px;
   display: block;
-  border-radius: 50%;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #000;
 }
 
 .sidebar-nav {
@@ -437,7 +439,7 @@ h1, h2, h3, h4 { font-weight: 600; line-height: 1.3; }
 
 .data-table tbody tr:hover { background: #f8fafc; }
 
-.data-table tbody tr.unread-row { background: #eff6ff; }
+.data-table tbody tr.unread-row { background: #eaf7fe; }
 .data-table tbody tr.unread-row:hover { background: #dbeafe; }
 
 .empty-row {
@@ -535,7 +537,7 @@ h1, h2, h3, h4 { font-weight: 600; line-height: 1.3; }
 .form-group select:focus,
 .form-group textarea:focus {
   border-color: var(--blue);
-  box-shadow: 0 0 0 3px rgba(26,86,219,0.1);
+  box-shadow: 0 0 0 3px rgba(0,119,182,0.1);
 }
 
 .form-row {
@@ -589,8 +591,8 @@ h1, h2, h3, h4 { font-weight: 600; line-height: 1.3; }
   color: #fff;
 }
 .btn-primary:hover:not(:disabled) {
-  background: #1648c0;
-  box-shadow: 0 2px 8px rgba(26,86,219,0.3);
+  background: #005b8c;
+  box-shadow: 0 2px 8px rgba(0,119,182,0.3);
 }
 
 .btn-secondary {

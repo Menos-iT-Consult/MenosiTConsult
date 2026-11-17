@@ -61,7 +61,7 @@ export default function SiteHeader() {
           <Link href="/" className="logo">
             <img
               className="logo-img"
-              src="/assets/logo.jpg"
+              src="/assets/logo-black.png"
               alt=""
               width="36"
               height="36"
