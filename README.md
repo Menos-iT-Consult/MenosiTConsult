@@ -75,12 +75,65 @@ node server.js    # API only, on PORT (default 3000)
 | Variable | Required | Purpose |
 |----------|----------|---------|
 | `POSTGRES_URL` | for data features | PostgreSQL connection string (tables + seed data are created automatically on first request) |
+| `ACADEMY_DATABASE_URL` | for Academy features | Separate PostgreSQL database connection for all Academy tables/settings; never falls back to `POSTGRES_URL` |
 | `SESSION_SECRET` | yes | Signs the admin auth cookie |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | for email | Nodemailer / Gmail SMTP |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | for main-site email | Nodemailer / Gmail SMTP credentials for contact and newsletter mail |
+| `SMTP_FROM` | optional | Visible From address for main-site email; defaults to `support@menositconsult.com` |
+| `ACADEMY_SMTP_HOST` / `ACADEMY_SMTP_PORT` / `ACADEMY_SMTP_USER` / `ACADEMY_SMTP_PASS` | for Academy email | Independent Nodemailer transport for Academy instructor invitations; does not fall back to main-site SMTP |
+| `ACADEMY_SMTP_FROM` | optional | Visible From address for Academy email; defaults to `academy@menositconsult.com` |
+| `SITE_URL` | optional | Public base URL used in instructor setup invitation links; defaults to the request origin |
+| `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET` | for main-site media | Main-site Cloudflare R2 credentials and bucket |
+| `ACADEMY_R2_BUCKET` | optional | Separate Academy R2 bucket; must differ from `R2_BUCKET` and does not fall back to it |
+| `ACADEMY_R2_PUBLIC_BASE` | optional | Public base URL for Academy media in its separate bucket |
 | `RECIPIENT_EMAIL` | for email | Where contact-form enquiries are delivered |
 | `ADMIN_PASSWORD` | for first boot | Seeded into the `admin` table |
+| `ACADEMY_ADMIN_EMAIL` / `ACADEMY_ADMIN_PASSWORD` | before first Academy request | Credentials for the first Academy administrator, seeded only when no Academy staff accounts exist |
 
 > **Gmail App Password:** Google Account → Security → 2-Step Verification → App passwords
+>
+> For local Next.js development, set these in the repository-root `.env.local`.
+> `backend/.env` is loaded by the legacy Express server, not by Next.js. The
+> Academy schema and starter data are created automatically on the first
+> Academy request, or can be prepared with `node backend/migrate-academy.js`.
+> The Academy database starts fresh; existing Academy records in the main
+> database are left untouched and are not copied.
+
+## MITA Academy instructor portal
+
+Academy administrators sign in at `/academy/admin/login` and manage instructors
+at `/academy/admin/instructors`. Admins can create courses, issue instructor
+accounts, create academic sessions, assign courses, and deactivate or reactivate
+active instructors.
+
+An issued instructor account starts pending. The Academy emails a single-use
+setup link that expires after seven days; setting a password activates the
+account. If SMTP delivery fails, the pending account remains in place and an
+administrator can resend the invitation (which replaces the previous link).
+Configure the Academy SMTP variables above before issuing invitations; the
+main-site `SMTP_*` settings are not used for Academy mail. Instructors
+sign in at `/instructor/login` and can access only courses assigned to their
+account. Their course workspaces include student rosters, assignments and
+submission review, gradebooks, attendance, and lesson planning.
+
+Cloudflare Email Routing can forward replies sent to
+`academy@menositconsult.com`, but it does not send outbound mail. The Academy's
+SMTP provider must authorize this From address (and the domain's SPF/DKIM
+records must match that provider) for invitation messages to be delivered
+reliably. Set `ACADEMY_SMTP_FROM` in the deployment environment if a different
+verified Academy address should be used.
+
+Main-site email uses the separately authenticated `SMTP_*` transport and
+displays `support@menositconsult.com` as its From address by default
+(`SMTP_FROM` can override it). As with Academy mail, the outbound SMTP provider
+must authorize this address; Cloudflare Email Routing alone only forwards
+incoming replies.
+
+Main-site image uploads target `R2_BUCKET`; Academy media storage targets
+`ACADEMY_R2_BUCKET`, rejects using the same bucket name, and never falls back
+to the main bucket. The storage adapter shares the R2 account credentials, so
+the R2 token must have access to both buckets. The Academy currently has no
+file-upload UI/API; the separate bucket adapter is in place for Academy media
+operations without changing main-site uploads.
 
 ---
 
@@ -101,6 +154,10 @@ node server.js    # API only, on PORT (default 3000)
 | `/cookies` | Cookie policy |
 | `/admin` | Admin dashboard (redirects to `/admin/login` when signed out) |
 | `/admin/login` | Admin login page |
+| `/academy/admin/login` | MITA Academy administrator login |
+| `/academy/admin/instructors` | Academy instructor accounts and course assignments |
+| `/instructor/login` | MITA Academy instructor login |
+| `/instructor/dashboard` | Instructor teaching dashboard |
 | `/api/health` | API health check |
 
 ---
@@ -197,13 +254,17 @@ Set these in **Project → Settings → Environment Variables**:
 | Variable | Value |
 |----------|-------|
 | `POSTGRES_URL` | the PostgreSQL connection string (required) |
+| `ACADEMY_DATABASE_URL` | the connection string for a separate Academy PostgreSQL database |
 | `SESSION_SECRET` | a long random string (required — signs admin cookies) |
 | `SMTP_HOST` | `smtp.gmail.com` |
 | `SMTP_PORT` | `587` |
 | `SMTP_USER` | your Gmail address |
 | `SMTP_PASS` | Gmail App Password |
+| `SMTP_FROM` | `support@menositconsult.com` |
 | `RECIPIENT_EMAIL` | where enquiries are delivered |
 | `ADMIN_PASSWORD` | the admin password to seed (see step 4) |
+| `ACADEMY_ADMIN_EMAIL` | `academy@menositconsult.com` or your chosen first-admin email |
+| `ACADEMY_ADMIN_PASSWORD` | a unique, strong password for the first Academy admin |
 
 ### 3. Deploy
 
@@ -234,7 +295,8 @@ node migrate.js
 
 1. Create a VM (Ubuntu 22.04+), install Node.js 20+ and PostgreSQL
 2. Clone the repo and run `npm install` at the project root
-3. Set `POSTGRES_URL`, `SESSION_SECRET`, SMTP vars, `ADMIN_PASSWORD`
+3. Set `POSTGRES_URL`, `ACADEMY_DATABASE_URL`, `SESSION_SECRET`, SMTP vars, `ADMIN_PASSWORD`,
+   `ACADEMY_ADMIN_EMAIL` and `ACADEMY_ADMIN_PASSWORD`
 4. Build and run the Next.js app behind Nginx/PM2:
    ```bash
    npm run build

@@ -1,17 +1,33 @@
 /**
- * Academy data-access layer (MITA — IT Academy).
- *
- * Reuses the shared Postgres pool + bootstrap from db.js (the academy_* tables
- * are created by db.js's initDb on the same first-query bootstrap). This module
- * adds its own one-time seeding on top: default grading scale, Student-ID
- * prefix, the initial academy admin staff account and a few published programs
- * so registration works out of the box.
+ * Academy data-access layer (MITA — IT Academy), backed by its own PostgreSQL
+ * database configured with ACADEMY_DATABASE_URL.
  */
 const crypto = require('crypto');
-const db = require('./db');
+const { AsyncLocalStorage } = require('async_hooks');
+const ensureAcademySchema = require('./academy-schema');
+const { getAcademyDatabaseConfigError } = require('../lib/academy-db-config');
+const { isInstructorInvitationRedeemable } = require('../lib/academy-invitations');
+const academyBootstrapContext = new AsyncLocalStorage();
+let Pool;
 
-function needPool() {
-  return db.needPool();
+try {
+  ({ Pool } = require('pg'));
+} catch {
+  Pool = null;
+}
+
+const academyDbConfigError = getAcademyDatabaseConfigError();
+const pool = !academyDbConfigError && Pool
+  ? new Pool({
+      connectionString: process.env.ACADEMY_DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    })
+  : null;
+
+function noAcademyDbError() {
+  const err = new Error(academyDbConfigError || 'Academy database driver is unavailable.');
+  err.noDb = true;
+  return err;
 }
 
 function newId(prefix) {
@@ -22,12 +38,16 @@ function newId(prefix) {
 let academyReadyPromise = null;
 
 function ensureAcademyReady() {
+  if (!pool) return Promise.reject(noAcademyDbError());
   if (!academyReadyPromise) {
     academyReadyPromise = (async () => {
-      await db.ensureReady(); // creates ALL tables incl. academy_*, seeds site data
-      await seedAcademy(console.log);
+      await academyBootstrapContext.run(true, async () => {
+        await ensureAcademySchema((sql) => pool.query(sql));
+        await seedAcademy(console.log);
+      });
     })().catch((err) => {
       academyReadyPromise = null; // allow retry on next call
+      if (!err.noDb) err.noDb = true;
       throw err;
     });
   }
@@ -35,8 +55,26 @@ function ensureAcademyReady() {
 }
 
 async function q(sql, params) {
+  if (!academyBootstrapContext.getStore()) await ensureAcademyReady();
+  if (!pool) throw noAcademyDbError();
+  return pool.query(sql, params);
+}
+
+async function transaction(callback) {
   await ensureAcademyReady();
-  return needPool().query(sql, params);
+  if (!pool) throw noAcademyDbError();
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await callback(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 // ── row → camelCase mappers ──────────────────────────────────────────────────
@@ -71,6 +109,43 @@ function mapStudent(r) {
     seq: r.seq != null ? Number(r.seq) : null,
     createdAt: iso(r.created_at),
     admittedAt: iso(r.admitted_at),
+  };
+}
+
+function mapCourse(r) {
+  return {
+    id: r.id,
+    programId: r.program_id || '',
+    code: r.code || '',
+    title: r.title,
+    creditHours: r.credit_hours != null ? Number(r.credit_hours) : 3,
+    semesterNumber: r.semester_number != null ? Number(r.semester_number) : 1,
+    description: r.description || '',
+    instructorStaffId: r.instructor_staff_id || '',
+    instructorName: r.instructor_name || '',
+    published: r.published !== false,
+  };
+}
+
+function dateOnly(value) {
+  if (value == null) return '';
+  return value instanceof Date
+    ? value.toISOString().slice(0, 10)
+    : String(value).slice(0, 10);
+}
+
+function mapLessonPlan(row) {
+  return {
+    id: row.id,
+    courseId: row.course_id,
+    sessionId: row.session_id || '',
+    lessonDate: dateOnly(row.lesson_date),
+    title: row.title,
+    objectives: row.objectives || '',
+    notes: row.notes || '',
+    resources: row.resources || '',
+    createdAt: iso(row.created_at),
+    updatedAt: iso(row.updated_at),
   };
 }
 
@@ -349,6 +424,14 @@ async function updateStaff(id, s) {
       WHERE id = $1 RETURNING *`,
     [id, s.name, s.email, s.role, s.status]
   );
+  if (rows[0] && s.status && s.status !== 'pending') {
+    await q(
+      `UPDATE academy_staff_invitations
+          SET consumed_at = COALESCE(consumed_at, now())
+        WHERE staff_id = $1 AND consumed_at IS NULL`,
+      [id]
+    );
+  }
   return rows[0] ? mapStaff(rows[0]) : null;
 }
 
@@ -357,7 +440,83 @@ async function updateStaffPassword(id, hash) {
 }
 
 async function deleteStaff(id) {
+  await q('UPDATE academy_courses SET instructor_staff_id = NULL WHERE instructor_staff_id = $1', [id]);
   await q('DELETE FROM academy_staff WHERE id = $1', [id]);
+}
+
+async function createInstructorInvitation({ name, email, tokenHash, expiresAt }) {
+  return transaction(async (client) => {
+    const staffId = newId('astf');
+    const { rows } = await client.query(
+      `INSERT INTO academy_staff (id, name, email, role, status, password_hash)
+       VALUES ($1, $2, $3, 'instructor', 'pending', NULL)
+       RETURNING *`,
+      [staffId, name, email]
+    );
+    await client.query(
+      `INSERT INTO academy_staff_invitations (id, staff_id, token_hash, expires_at)
+       VALUES ($1, $2, $3, $4)`,
+      [newId('ainv'), staffId, tokenHash, expiresAt]
+    );
+    return mapStaff(rows[0]);
+  });
+}
+
+async function rotateInstructorInvitation(staffId, tokenHash, expiresAt) {
+  return transaction(async (client) => {
+    const { rows: staffRows } = await client.query(
+      `SELECT * FROM academy_staff
+        WHERE id = $1 AND role = 'instructor' AND status = 'pending'
+        FOR UPDATE`,
+      [staffId]
+    );
+    if (!staffRows[0]) return null;
+    await client.query(
+      `UPDATE academy_staff_invitations
+          SET consumed_at = COALESCE(consumed_at, now())
+        WHERE staff_id = $1 AND consumed_at IS NULL`,
+      [staffId]
+    );
+    await client.query(
+      `INSERT INTO academy_staff_invitations (id, staff_id, token_hash, expires_at)
+       VALUES ($1, $2, $3, $4)`,
+      [newId('ainv'), staffId, tokenHash, expiresAt]
+    );
+    return mapStaff(staffRows[0]);
+  });
+}
+
+async function acceptInstructorInvitation(tokenHash, passwordHash) {
+  return transaction(async (client) => {
+    const { rows } = await client.query(
+      `SELECT i.id AS invitation_id, i.expires_at, i.consumed_at,
+              s.*, now() AS database_now
+         FROM academy_staff_invitations i
+         JOIN academy_staff s ON s.id = i.staff_id
+        WHERE i.token_hash = $1
+        FOR UPDATE OF i, s`,
+      [tokenHash]
+    );
+    const staff = rows[0];
+    if (!isInstructorInvitationRedeemable(staff && {
+      role: staff.role,
+      status: staff.status,
+      consumedAt: staff.consumed_at,
+      expiresAt: staff.expires_at,
+    }, staff && staff.database_now)) return null;
+    await client.query(
+      `UPDATE academy_staff_invitations SET consumed_at = now() WHERE id = $1`,
+      [staff.invitation_id]
+    );
+    const { rows: updated } = await client.query(
+      `UPDATE academy_staff
+          SET password_hash = $2, status = 'active'
+        WHERE id = $1 AND status = 'pending'
+        RETURNING *`,
+      [staff.id, passwordHash]
+    );
+    return updated[0] ? mapStaff(updated[0]) : null;
+  });
 }
 
 // ── programs ─────────────────────────────────────────────────────────────────
@@ -411,6 +570,129 @@ async function deleteProgram(id) {
   await q('DELETE FROM academy_programs WHERE id = $1', [id]);
 }
 
+// ── academy courses ──────────────────────────────────────────────────────────
+async function createCourse(course) {
+  const { rows } = await q(
+    `INSERT INTO academy_courses
+      (id, program_id, code, title, credit_hours, semester_number, description, published)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+     RETURNING *`,
+    [
+      newId('acrs'),
+      course.programId || null,
+      course.code ? String(course.code).trim().toUpperCase() : null,
+      course.title,
+      course.creditHours,
+      course.semesterNumber,
+      course.description || '',
+    ]
+  );
+  return mapCourse(rows[0]);
+}
+
+async function listCourses({ instructorStaffId } = {}) {
+  const params = [];
+  let where = '';
+  if (instructorStaffId) {
+    params.push(instructorStaffId);
+    where = 'WHERE c.instructor_staff_id = $1';
+  }
+  const { rows } = await q(
+    `SELECT c.*, s.name AS instructor_name
+       FROM academy_courses c
+       LEFT JOIN academy_staff s ON s.id = c.instructor_staff_id
+       ${where}
+      ORDER BY c.title ASC`,
+    params
+  );
+  return rows.map(mapCourse);
+}
+
+async function getCourse(id) {
+  const { rows } = await q(
+    `SELECT c.*, s.name AS instructor_name
+       FROM academy_courses c
+       LEFT JOIN academy_staff s ON s.id = c.instructor_staff_id
+      WHERE c.id = $1`,
+    [id]
+  );
+  return rows[0] ? mapCourse(rows[0]) : null;
+}
+
+async function setInstructorCourses(staffId, courseIds) {
+  const uniqueIds = [...new Set(courseIds)];
+  return transaction(async (client) => {
+    const { rows: staffRows } = await client.query(
+      `SELECT id FROM academy_staff WHERE id = $1 AND role = 'instructor' FOR UPDATE`,
+      [staffId]
+    );
+    if (!staffRows[0]) return null;
+    if (uniqueIds.length) {
+      const { rows: courses } = await client.query(
+        'SELECT id FROM academy_courses WHERE id = ANY($1::text[])',
+        [uniqueIds]
+      );
+      if (courses.length !== uniqueIds.length) {
+        const err = new Error('One or more selected courses were not found.');
+        err.code = 'COURSE_NOT_FOUND';
+        throw err;
+      }
+    }
+    await client.query(
+      `UPDATE academy_courses
+          SET instructor_staff_id = NULL
+        WHERE instructor_staff_id = $1
+          AND NOT (id = ANY($2::text[]))`,
+      [staffId, uniqueIds]
+    );
+    if (uniqueIds.length) {
+      await client.query(
+        `UPDATE academy_courses SET instructor_staff_id = $1
+          WHERE id = ANY($2::text[])`,
+        [staffId, uniqueIds]
+      );
+    }
+    return uniqueIds;
+  });
+}
+
+async function isCourseAssignedToInstructor(courseId, staffId) {
+  const { rows } = await q(
+    `SELECT 1 FROM academy_courses
+      WHERE id = $1 AND instructor_staff_id = $2`,
+    [courseId, staffId]
+  );
+  return rows.length > 0;
+}
+
+async function listInstructorRoster(courseId, staffId) {
+  const { rows } = await q(
+    `SELECT e.id AS enrollment_id, e.student_id, e.course_id, e.session_id, e.status,
+            st.first_name, st.middle_name, st.last_name, st.student_id AS student_number,
+            st.email, st.phone, s.name AS session_name
+       FROM academy_courses c
+       JOIN academy_enrollments e ON e.course_id = c.id
+       JOIN academy_students st ON st.id = e.student_id
+       LEFT JOIN academy_sessions s ON s.id = e.session_id
+      WHERE c.id = $1 AND c.instructor_staff_id = $2
+        AND e.status IN ('enrolled', 'active')
+      ORDER BY s.start_date DESC, st.last_name, st.first_name`,
+    [courseId, staffId]
+  );
+  return rows.map((row) => ({
+    enrollmentId: row.enrollment_id,
+    studentId: row.student_id,
+    studentNumber: row.student_number || '',
+    name: [row.first_name, row.middle_name, row.last_name].filter(Boolean).join(' '),
+    email: row.email || '',
+    phone: row.phone || '',
+    courseId: row.course_id,
+    sessionId: row.session_id,
+    sessionName: row.session_name || '',
+    status: row.status,
+  }));
+}
+
 // ── academy sessions ────────────────────────────────────────────────────────
 async function listSessions({ currentOnly } = {}) {
   const where = currentOnly ? 'WHERE is_current = true' : '';
@@ -419,6 +701,20 @@ async function listSessions({ currentOnly } = {}) {
     []
   );
   return rows;
+}
+
+async function createAcademySession({ name, startDate, endDate, isCurrent }) {
+  return transaction(async (client) => {
+    if (isCurrent) await client.query('UPDATE academy_sessions SET is_current = false');
+    const { rows } = await client.query(
+      `INSERT INTO academy_sessions
+        (id, name, start_date, end_date, is_current)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [newId('ases'), name, startDate || null, endDate || null, isCurrent === true]
+    );
+    return rows[0];
+  });
 }
 
 async function listEnrollmentsBySession() {
@@ -630,6 +926,83 @@ async function deleteAssignment(id) {
   await q('DELETE FROM academy_assignments WHERE id = $1', [id]);
 }
 
+async function listInstructorAssignments(staffId, courseId) {
+  const params = [staffId];
+  const courseFilter = courseId ? ` AND c.id = $2` : '';
+  if (courseId) params.push(courseId);
+  const { rows } = await q(
+    `SELECT a.*
+       FROM academy_assignments a
+       JOIN academy_courses c ON c.id = a.course_id
+      WHERE c.instructor_staff_id = $1${courseFilter}
+      ORDER BY a.due_at NULLS LAST, a.created_at DESC`,
+    params
+  );
+  return rows.map(mapAssignment);
+}
+
+async function listStudentAssignments(studentId) {
+  const { rows } = await q(
+    `SELECT a.*
+       FROM academy_assignments a
+       JOIN academy_enrollments e
+         ON e.student_id = $1 AND e.course_id = a.course_id
+        AND e.session_id = a.session_id AND e.status IN ('enrolled', 'active')
+      ORDER BY a.due_at NULLS LAST, a.created_at DESC`,
+    [studentId]
+  );
+  return rows.map(mapAssignment);
+}
+
+async function createInstructorAssignment(staffId, assignment) {
+  const { rows } = await q(
+    `INSERT INTO academy_assignments
+      (id, course_id, session_id, title, instructions, due_at, max_score, created_by)
+     SELECT $1, c.id, $3, $4, $5, $6, $7, $8
+       FROM academy_courses c
+      WHERE c.id = $2 AND c.instructor_staff_id = $9
+     RETURNING *`,
+    [
+      newId('acaa'), assignment.courseId, assignment.sessionId, assignment.title,
+      assignment.instructions || null, assignment.dueAt || null,
+      assignment.maxScore != null ? Number(assignment.maxScore) : 100,
+      staffId, staffId,
+    ]
+  );
+  return rows[0] ? mapAssignment(rows[0]) : null;
+}
+
+async function updateInstructorAssignment(staffId, assignmentId, assignment) {
+  const { rows } = await q(
+    `UPDATE academy_assignments a
+        SET title = COALESCE($3, a.title),
+            instructions = COALESCE($4, a.instructions),
+            due_at = COALESCE($5, a.due_at),
+            max_score = COALESCE($6, a.max_score)
+       FROM academy_courses c
+      WHERE a.id = $1 AND c.id = a.course_id
+        AND c.instructor_staff_id = $2
+      RETURNING a.*`,
+    [
+      assignmentId, staffId, assignment.title, assignment.instructions,
+      assignment.dueAt, assignment.maxScore != null ? Number(assignment.maxScore) : null,
+    ]
+  );
+  return rows[0] ? mapAssignment(rows[0]) : null;
+}
+
+async function deleteInstructorAssignment(staffId, assignmentId) {
+  const { rows } = await q(
+    `DELETE FROM academy_assignments a
+      USING academy_courses c
+      WHERE a.id = $1 AND c.id = a.course_id
+        AND c.instructor_staff_id = $2
+      RETURNING a.id`,
+    [assignmentId, staffId]
+  );
+  return rows.length > 0;
+}
+
 // ── academy submissions ───────────────────────────────────────────────────────
 async function listSubmissions({ assignmentId, studentId } = {}) {
   let sql = 'SELECT * FROM academy_submissions WHERE 1=1';
@@ -676,6 +1049,25 @@ async function createSubmission(s) {
   return mapSubmission(rows[0]);
 }
 
+async function createStudentSubmission(studentId, submission) {
+  const { rows } = await q(
+    `INSERT INTO academy_submissions
+      (id, assignment_id, student_id, text, file)
+     SELECT $1, a.id, e.student_id, $4, $5
+       FROM academy_assignments a
+       JOIN academy_enrollments e
+         ON e.student_id = $2 AND e.course_id = a.course_id
+        AND e.session_id = a.session_id AND e.status IN ('enrolled', 'active')
+      WHERE a.id = $3
+     RETURNING *`,
+    [
+      newId('acms'), studentId, submission.assignmentId,
+      submission.text || null, submission.file || null,
+    ]
+  );
+  return rows[0] ? mapSubmission(rows[0]) : null;
+}
+
 async function updateSubmission(id, s) {
   const { rows } = await q(
     `UPDATE academy_submissions
@@ -701,6 +1093,56 @@ async function updateSubmission(id, s) {
 
 async function deleteSubmission(id) {
   await q('DELETE FROM academy_submissions WHERE id = $1', [id]);
+}
+
+async function listInstructorSubmissions(staffId, courseId) {
+  const params = [staffId];
+  const courseFilter = courseId ? ' AND c.id = $2' : '';
+  if (courseId) params.push(courseId);
+  const { rows } = await q(
+    `SELECT sub.*, a.title AS assignment_title, a.course_id,
+            st.first_name, st.middle_name, st.last_name, st.student_id AS student_number
+       FROM academy_submissions sub
+       JOIN academy_assignments a ON a.id = sub.assignment_id
+       JOIN academy_courses c ON c.id = a.course_id
+       JOIN academy_students st ON st.id = sub.student_id
+      WHERE c.instructor_staff_id = $1${courseFilter}
+      ORDER BY sub.submitted_at DESC`,
+    params
+  );
+  return rows.map((row) => ({
+    ...mapSubmission(row),
+    assignmentTitle: row.assignment_title,
+    courseId: row.course_id,
+    studentName: [row.first_name, row.middle_name, row.last_name].filter(Boolean).join(' '),
+    studentNumber: row.student_number || '',
+  }));
+}
+
+async function updateInstructorSubmission(staffId, submissionId, { score, feedback }) {
+  const { rows } = await q(
+    `UPDATE academy_submissions sub
+        SET score = $3, feedback = $4, graded_by = $2, graded_at = now()
+       FROM academy_assignments a
+       JOIN academy_courses c ON c.id = a.course_id
+      WHERE sub.id = $1 AND a.id = sub.assignment_id
+        AND c.instructor_staff_id = $2
+      RETURNING sub.*`,
+    [submissionId, staffId, score, feedback || null]
+  );
+  return rows[0] ? mapSubmission(rows[0]) : null;
+}
+
+async function getInstructorSubmissionMaxScore(staffId, submissionId) {
+  const { rows } = await q(
+    `SELECT a.max_score
+       FROM academy_submissions sub
+       JOIN academy_assignments a ON a.id = sub.assignment_id
+       JOIN academy_courses c ON c.id = a.course_id
+      WHERE sub.id = $1 AND c.instructor_staff_id = $2`,
+    [submissionId, staffId]
+  );
+  return rows[0] && rows[0].max_score != null ? Number(rows[0].max_score) : null;
 }
 
 // ── academy grades ────────────────────────────────────────────────────────────
@@ -767,6 +1209,215 @@ async function getGrade(enrollmentId) {
     [enrollmentId]
   );
   return rows[0] ? mapGrade(rows[0]) : null;
+}
+
+async function listInstructorGradebook(staffId, courseId) {
+  const { rows } = await q(
+    `SELECT e.id AS enrollment_id, e.course_id, e.session_id, e.status,
+            st.id AS student_id, st.student_id AS student_number,
+            st.first_name, st.middle_name, st.last_name,
+            g.ca, g.exam, g.total, g.letter, g.points, g.updated_at
+       FROM academy_courses c
+       JOIN academy_enrollments e ON e.course_id = c.id
+       JOIN academy_students st ON st.id = e.student_id
+       LEFT JOIN academy_grades g ON g.enrollment_id = e.id
+      WHERE c.id = $1 AND c.instructor_staff_id = $2
+        AND e.status IN ('enrolled', 'active')
+      ORDER BY st.last_name, st.first_name`,
+    [courseId, staffId]
+  );
+  return rows.map((row) => ({
+    enrollmentId: row.enrollment_id,
+    courseId: row.course_id,
+    sessionId: row.session_id,
+    enrollmentStatus: row.status,
+    studentId: row.student_id,
+    studentNumber: row.student_number || '',
+    studentName: [row.first_name, row.middle_name, row.last_name].filter(Boolean).join(' '),
+    ca: row.ca == null ? null : Number(row.ca),
+    exam: row.exam == null ? null : Number(row.exam),
+    total: row.total == null ? null : Number(row.total),
+    letter: row.letter || '',
+    points: row.points == null ? null : Number(row.points),
+    updatedAt: iso(row.updated_at),
+  }));
+}
+
+async function upsertInstructorGrade(staffId, { enrollmentId, ca, exam }) {
+  const weightedTotal = '((COALESCE($3, 0) * 0.3) + (COALESCE($4, 0) * 0.7))';
+  const { rows } = await q(
+    `INSERT INTO academy_grades
+      (enrollment_id, ca, exam, total, letter, points, updated_by, updated_at)
+     SELECT e.id, $3, $4, ${weightedTotal},
+            CASE
+              WHEN ${weightedTotal} >= 80 THEN 'A'
+              WHEN ${weightedTotal} >= 70 THEN 'B'
+              WHEN ${weightedTotal} >= 60 THEN 'C'
+              WHEN ${weightedTotal} >= 50 THEN 'D'
+              WHEN ${weightedTotal} >= 45 THEN 'E'
+              ELSE 'F'
+            END,
+            CASE
+              WHEN ${weightedTotal} >= 80 THEN 5
+              WHEN ${weightedTotal} >= 70 THEN 4
+              WHEN ${weightedTotal} >= 60 THEN 3
+              WHEN ${weightedTotal} >= 50 THEN 2
+              WHEN ${weightedTotal} >= 45 THEN 1
+              ELSE 0
+            END,
+            $2, now()
+       FROM academy_enrollments e
+       JOIN academy_courses c ON c.id = e.course_id
+      WHERE e.id = $1 AND c.instructor_staff_id = $2
+        AND e.status IN ('enrolled', 'active')
+     ON CONFLICT (enrollment_id) DO UPDATE
+       SET ca = EXCLUDED.ca, exam = EXCLUDED.exam, total = EXCLUDED.total,
+           letter = EXCLUDED.letter, points = EXCLUDED.points,
+           updated_by = EXCLUDED.updated_by, updated_at = now()
+     RETURNING *`,
+    [enrollmentId, staffId, ca, exam]
+  );
+  return rows[0] ? mapGrade(rows[0]) : null;
+}
+
+async function listInstructorAttendance(staffId, { courseId, sessionId, meetingDate } = {}) {
+  const params = [staffId];
+  const filters = [];
+  if (courseId) {
+    params.push(courseId);
+    filters.push(`a.course_id = $${params.length}`);
+  }
+  if (sessionId) {
+    params.push(sessionId);
+    filters.push(`a.session_id = $${params.length}`);
+  }
+  if (meetingDate) {
+    params.push(meetingDate);
+    filters.push(`a.meeting_date = $${params.length}`);
+  }
+  const { rows } = await q(
+    `SELECT a.*, st.first_name, st.middle_name, st.last_name,
+            st.student_id AS student_number
+       FROM academy_attendance a
+       JOIN academy_courses c ON c.id = a.course_id
+       JOIN academy_students st ON st.id = a.student_id
+      WHERE c.instructor_staff_id = $1
+        ${filters.map((filter) => `AND ${filter}`).join('\n        ')}
+      ORDER BY a.meeting_date DESC, st.last_name, st.first_name`,
+    params
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    courseId: row.course_id,
+    sessionId: row.session_id,
+    studentId: row.student_id,
+    studentName: [row.first_name, row.middle_name, row.last_name].filter(Boolean).join(' '),
+    studentNumber: row.student_number || '',
+    meetingDate: dateOnly(row.meeting_date),
+    status: row.status,
+    note: row.note || '',
+    updatedAt: iso(row.updated_at),
+  }));
+}
+
+async function saveInstructorAttendance(staffId, { courseId, sessionId, meetingDate, records }) {
+  return transaction(async (client) => {
+    const { rows: courseRows } = await client.query(
+      `SELECT id FROM academy_courses
+        WHERE id = $1 AND instructor_staff_id = $2
+        FOR UPDATE`,
+      [courseId, staffId]
+    );
+    if (!courseRows[0]) return null;
+    const saved = [];
+    for (const record of records) {
+      const { rows } = await client.query(
+        `INSERT INTO academy_attendance
+          (id, course_id, session_id, student_id, meeting_date, status, note, recorded_by)
+         SELECT $1, e.course_id, e.session_id, e.student_id, $5, $6, $7, $8
+           FROM academy_enrollments e
+          WHERE e.student_id = $4 AND e.course_id = $2 AND e.session_id = $3
+            AND e.status IN ('enrolled', 'active')
+         ON CONFLICT (course_id, session_id, student_id, meeting_date)
+         DO UPDATE SET status = EXCLUDED.status, note = EXCLUDED.note,
+                       recorded_by = EXCLUDED.recorded_by, updated_at = now()
+         RETURNING *`,
+        [
+          newId('aatd'), courseId, sessionId, record.studentId, meetingDate,
+          record.status, record.note || null, staffId,
+        ]
+      );
+      if (!rows[0]) {
+        const err = new Error('A selected student is not enrolled in this course session.');
+        err.code = 'STUDENT_NOT_ENROLLED';
+        throw err;
+      }
+      saved.push(rows[0]);
+    }
+    return saved;
+  });
+}
+
+async function listInstructorLessonPlans(staffId, courseId) {
+  const { rows } = await q(
+    `SELECT p.* FROM academy_lesson_plans p
+       JOIN academy_courses c ON c.id = p.course_id
+      WHERE c.instructor_staff_id = $1 AND p.course_id = $2
+      ORDER BY p.lesson_date NULLS LAST, p.created_at DESC`,
+    [staffId, courseId]
+  );
+  return rows.map(mapLessonPlan);
+}
+
+async function createInstructorLessonPlan(staffId, plan) {
+  const { rows } = await q(
+    `INSERT INTO academy_lesson_plans
+      (id, course_id, session_id, lesson_date, title, objectives, notes, resources, created_by)
+     SELECT $1, c.id, $3, $4, $5, $6, $7, $8, $2
+       FROM academy_courses c
+      WHERE c.id = $9 AND c.instructor_staff_id = $2
+     RETURNING *`,
+    [
+      newId('alpn'), staffId, plan.sessionId || null, plan.lessonDate || null,
+      plan.title, plan.objectives || null, plan.notes || null, plan.resources || null,
+      plan.courseId,
+    ]
+  );
+  return rows[0] ? mapLessonPlan(rows[0]) : null;
+}
+
+async function updateInstructorLessonPlan(staffId, planId, plan) {
+  const { rows } = await q(
+    `UPDATE academy_lesson_plans p
+        SET session_id = COALESCE($3, p.session_id),
+            lesson_date = COALESCE($4, p.lesson_date),
+            title = COALESCE($5, p.title),
+            objectives = COALESCE($6, p.objectives),
+            notes = COALESCE($7, p.notes),
+            resources = COALESCE($8, p.resources),
+            updated_at = now()
+       FROM academy_courses c
+      WHERE p.id = $1 AND c.id = p.course_id
+        AND c.instructor_staff_id = $2
+      RETURNING p.*`,
+    [
+      planId, staffId, plan.sessionId, plan.lessonDate, plan.title,
+      plan.objectives, plan.notes, plan.resources,
+    ]
+  );
+  return rows[0] ? mapLessonPlan(rows[0]) : null;
+}
+
+async function deleteInstructorLessonPlan(staffId, planId) {
+  const { rows } = await q(
+    `DELETE FROM academy_lesson_plans p
+      USING academy_courses c
+      WHERE p.id = $1 AND c.id = p.course_id
+        AND c.instructor_staff_id = $2
+      RETURNING p.id`,
+    [planId, staffId]
+  );
+  return rows.length > 0;
 }
 
 function mapEnrollment(r) {
@@ -1088,16 +1739,24 @@ async function createAnnouncement(announcement) {
   return rows[0];
 }
 
-// ── academy settings (stored in the shared settings table, academy_* keys) ──
+// ── academy settings ─────────────────────────────────────────────────────────
 async function getAcademySetting(key) {
-  await ensureAcademyReady();
-  const row = await db.getSetting(`academy_${key}`);
-  return row ? row.value : null;
+  const { rows } = await q('SELECT value FROM academy_settings WHERE key = $1', [key]);
+  if (!rows[0]) return null;
+  let value = rows[0].value;
+  if (typeof value === 'string') {
+    try { value = JSON.parse(value); } catch { /* keep raw */ }
+  }
+  return value;
 }
 
 async function setAcademySetting(key, value) {
-  await ensureAcademyReady();
-  return db.setSetting(`academy_${key}`, value);
+  const { rows } = await q(
+    `INSERT INTO academy_settings (key, value) VALUES ($1, $2)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value RETURNING value`,
+    [key, JSON.stringify(value)]
+  );
+  return { key, value: rows[0].value };
 }
 
 // ── academy defaults seeding ─────────────────────────────────────────────────
@@ -1139,13 +1798,13 @@ const SAMPLE_PROGRAMS = [
 
 async function seedAcademy(log = () => {}) {
   // grading scale + weights (configurable in Academy Admin → Settings)
-  if (!(await db.getSetting('academy_grading'))) {
-    await db.setSetting('academy_grading', DEFAULT_GRADING);
+  if (!(await getAcademySetting('grading'))) {
+    await setAcademySetting('grading', DEFAULT_GRADING);
     log('[seed] academy grading scale seeded (5.0-point scale, 30/70 CA-exam weights)');
   }
   // Student ID prefix
-  if (!(await db.getSetting('academy_id_prefix'))) {
-    await db.setSetting('academy_id_prefix', 'MITA');
+  if (!(await getAcademySetting('id_prefix'))) {
+    await setAcademySetting('id_prefix', 'MITA');
     log('[seed] academy Student ID prefix seeded (MITA)');
   }
   // initial staff (academy admin) — from env, or data/academy-staff.json
@@ -1184,6 +1843,7 @@ async function seedAcademy(log = () => {}) {
 }
 
 module.exports = {
+  q,
   ensureAcademyReady,
   newId,
   // students
@@ -1193,18 +1853,31 @@ module.exports = {
   // staff
   listStaff, getStaff, getStaffByEmail, getStaffAuthByEmail, getStaffCredentials,
   createStaff, updateStaff, updateStaffPassword, deleteStaff,
+  createInstructorInvitation, rotateInstructorInvitation, acceptInstructorInvitation,
   // programs
   listPrograms, getProgram, createProgram, updateProgram, deleteProgram,
+  // courses
+  createCourse, listCourses, getCourse, setInstructorCourses, isCourseAssignedToInstructor,
+  listInstructorRoster,
   // sessions
-  listSessions, listEnrollmentsBySession, getStudentPortalData,
+  listSessions, createAcademySession, listEnrollmentsBySession, getStudentPortalData,
   // enrollments
   getEnrollment, createEnrollment, updateEnrollment, deleteEnrollment,
   // assignments
   listAssignments, getAssignment, createAssignment, updateAssignment, deleteAssignment,
+  listInstructorAssignments, listStudentAssignments,
+  createInstructorAssignment, updateInstructorAssignment,
+  deleteInstructorAssignment,
   // submissions
   listSubmissions, getSubmission, createSubmission, updateSubmission, deleteSubmission,
+  createStudentSubmission, listInstructorSubmissions, updateInstructorSubmission,
+  getInstructorSubmissionMaxScore,
   // grades
-  calculateGrade, upsertGrade, getGrade,
+  calculateGrade, upsertGrade, getGrade, listInstructorGradebook, upsertInstructorGrade,
+  // instructor attendance and lesson plans
+  listInstructorAttendance, saveInstructorAttendance,
+  listInstructorLessonPlans, createInstructorLessonPlan,
+  updateInstructorLessonPlan, deleteInstructorLessonPlan,
   // timetable
   listTimetable, getTimetable, createTimetable, updateTimetable, deleteTimetable,
   // exams

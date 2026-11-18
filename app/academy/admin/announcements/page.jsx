@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export default function AcademyAnnouncementsAdminPage() {
   const router = useRouter();
@@ -89,7 +90,10 @@ export default function AcademyAnnouncementsAdminPage() {
           <h1>Academy announcements</h1>
           <p>Publish updates for all students or a selected session.</p>
         </div>
-        <button className="ap-button" onClick={signOut}>Sign out</button>
+        <div className="ap-actions">
+          <Link className="ap-button" href="/academy/admin/instructors">Instructor accounts</Link>
+          <button className="ap-button" onClick={signOut}>Sign out</button>
+        </div>
       </header>
 
       {error && <div className="ap-error" role="alert">{error}</div>}

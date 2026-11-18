@@ -1,64 +1,73 @@
 import { NextResponse } from 'next/server';
+
 const academy = require('../../../../backend/academy-db');
+const auth = require('../../../../lib/academy-auth');
+const staffAuth = require('../../../../lib/academy-staff');
+const { noDbErrorResponse } = require('../../../../lib/api-helpers');
+
+async function activeStudent(request) {
+  const studentId = auth.getStudentId(request);
+  if (!studentId) return null;
+  const student = await academy.getStudent(studentId);
+  return student && student.status === 'active' ? student : null;
+}
 
 export async function GET(request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const sessionId = searchParams.get('session_id');
-    const courseId = searchParams.get('course_id');
-    const studentId = searchParams.get('student_id');
-
-    let enrollments;
-    if (studentId) {
-      enrollments = await academy.listSubmissions({ assignmentId: null, studentId });
-      // Actually list enrollments for student
-      const { rows } = await academy.q(
-        'SELECT * FROM academy_enrollments WHERE student_id = $1 ORDER BY created_at DESC',
-        [studentId]
+    const courseId = new URL(request.url).searchParams.get('course_id');
+    if (auth.getStaffId(request)) {
+      const gate = await staffAuth.requireInstructor(request);
+      if (gate.error) return NextResponse.json({ error: gate.error }, { status: gate.status });
+      if (courseId) {
+        const courseGate = await staffAuth.requireAssignedCourse(request, courseId);
+        if (courseGate.error) {
+          return NextResponse.json({ error: courseGate.error }, { status: courseGate.status });
+        }
+        return NextResponse.json(await academy.listInstructorRoster(courseId, gate.staff.id));
+      }
+      const courses = await academy.listCourses({ instructorStaffId: gate.staff.id });
+      const rosters = await Promise.all(
+        courses.map((course) => academy.listInstructorRoster(course.id, gate.staff.id))
       );
-      return NextResponse.json(rows);
-    } else if (sessionId) {
-      const { rows } = await academy.q(
-        'SELECT * FROM academy_enrollments WHERE session_id = $1 ORDER BY created_at DESC',
-        [sessionId]
-      );
-      return NextResponse.json(rows);
-    } else if (courseId) {
-      const { rows } = await academy.q(
-        'SELECT * FROM academy_enrollments WHERE course_id = $1 ORDER BY created_at DESC',
-        [courseId]
-      );
-      return NextResponse.json(rows);
+      return NextResponse.json(rosters.flat());
     }
 
+    const student = await activeStudent(request);
+    if (!student) return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
     const { rows } = await academy.q(
-      'SELECT * FROM academy_enrollments ORDER BY created_at DESC'
+      `SELECT * FROM academy_enrollments
+        WHERE student_id = $1 AND status IN ('enrolled', 'active')
+        ORDER BY created_at DESC`,
+      [student.id]
     );
-    return NextResponse.json(rows);
+    return NextResponse.json(courseId ? rows.filter((row) => row.course_id === courseId) : rows);
   } catch (err) {
+    const noDb = noDbErrorResponse(err);
+    if (noDb) return noDb;
     console.error('Academy enrollments error:', err);
-    return NextResponse.json(
-      { error: 'Could not load enrollments.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Could not load enrollments.' }, { status: 500 });
   }
 }
 
 export async function POST(request) {
   try {
+    const gate = await staffAuth.requireAdministrator(request);
+    if (gate.error) return NextResponse.json({ error: gate.error }, { status: gate.status });
     const body = await request.json().catch(() => ({}));
+    if (!body.studentId || !body.courseId || !body.sessionId) {
+      return NextResponse.json({ error: 'Student, course, and session are required.' }, { status: 400 });
+    }
     const enrollment = await academy.createEnrollment({
       studentId: body.studentId,
       courseId: body.courseId,
       sessionId: body.sessionId,
       status: body.status,
     });
-    return NextResponse.json(enrollment);
+    return NextResponse.json(enrollment, { status: 201 });
   } catch (err) {
+    const noDb = noDbErrorResponse(err);
+    if (noDb) return noDb;
     console.error('Academy enrollment create error:', err);
-    return NextResponse.json(
-      { error: 'Could not create enrollment.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Could not create enrollment.' }, { status: 500 });
   }
 }

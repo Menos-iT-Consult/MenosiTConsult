@@ -45,7 +45,7 @@ export async function POST(request) {
 
     try {
       await transporter.sendMail({
-        from: `"Menos iT Website" <${process.env.SMTP_USER}>`,
+        from: `"Menos iT Website" <${mailer.getMainFromAddress()}>`,
         to: process.env.RECIPIENT_EMAIL,
         subject: 'New newsletter subscriber',
         html: `

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getAcademyDatabaseConfigError } from './lib/academy-db-config';
 
 /**
  * Auth gate for /admin.
@@ -83,6 +84,13 @@ export async function middleware(request) {
   const { pathname } = request.nextUrl;
   const secret = process.env.SESSION_SECRET || '';
 
+  if (pathname.startsWith('/api/academy/')) {
+    const academyDbConfigError = getAcademyDatabaseConfigError();
+    if (academyDbConfigError) {
+      return NextResponse.json({ error: academyDbConfigError }, { status: 503 });
+    }
+  }
+
   // ── Academy Admin (MITA staff) ────────────────────────────────────────────
   // Gated with its own signed cookie (academy_staff). Public route: the login
   // page itself.
@@ -98,6 +106,18 @@ export async function middleware(request) {
   // ── Academy student portal ────────────────────────────────────────────────
   // Gated with its own signed cookie (academy_student). Public routes: the
   // landing page and the login/register pages.
+  if (
+    pathname === '/instructor/login' ||
+    pathname === '/instructor/setup'
+  ) {
+    return NextResponse.next();
+  }
+  if (pathname === '/instructor' || pathname.startsWith('/instructor/')) {
+    const valid = await signedCookieValid(request, 'academy_staff', secret);
+    if (valid) return NextResponse.next();
+    return redirect(request, '/instructor/login');
+  }
+
   if (
     pathname === '/academy/login' ||
     pathname === '/academy/register' ||
@@ -139,5 +159,5 @@ function redirect(request, path) {
 }
 
 export const config = {
-  matcher: ['/admin', '/admin/:path*', '/academy/:path*'],
+  matcher: ['/admin', '/admin/:path*', '/academy/:path*', '/api/academy/:path*', '/instructor', '/instructor/:path*'],
 };

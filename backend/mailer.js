@@ -15,9 +15,15 @@ const nodemailer = require('nodemailer');
 const db = require('./db');
 
 const SITE_URL = (process.env.SITE_URL || 'https://menositsolutions.vercel.app').replace(/\/$/, '');
+const DEFAULT_MAIN_SMTP_FROM = 'support@menositconsult.com';
+
+function getMainFromAddress() {
+  return String(process.env.SMTP_FROM || DEFAULT_MAIN_SMTP_FROM).trim();
+}
 
 // ── transport (lazy, cached) ───────────────────────────────────────────────
 let _transporter = null;
+let _academyTransporter = null;
 function getTransporter() {
   if (_transporter) return _transporter;
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
@@ -31,9 +37,22 @@ function getTransporter() {
   return _transporter;
 }
 
+function getAcademyTransporter() {
+  if (_academyTransporter) return _academyTransporter;
+  const { ACADEMY_SMTP_HOST, ACADEMY_SMTP_PORT, ACADEMY_SMTP_USER, ACADEMY_SMTP_PASS } = process.env;
+  if (!ACADEMY_SMTP_HOST || !ACADEMY_SMTP_USER || !ACADEMY_SMTP_PASS) return null;
+  _academyTransporter = nodemailer.createTransport({
+    host: ACADEMY_SMTP_HOST,
+    port: Number(ACADEMY_SMTP_PORT) || 587,
+    secure: Number(ACADEMY_SMTP_PORT) === 465,
+    auth: { user: ACADEMY_SMTP_USER, pass: ACADEMY_SMTP_PASS },
+  });
+  return _academyTransporter;
+}
+
 // ── who receives the admin alert / what contact copy to show ──────────────
 // RECIPIENT_EMAIL first, then the admin-maintained contact email from
-// Settings, then the SMTP account itself.
+// Settings, then the configured public sender address.
 async function resolveContactContext() {
   const ctx = { email: null, phone: '', whatsapp: '', location: '' };
   try {
@@ -47,7 +66,7 @@ async function resolveContactContext() {
   } catch (_) { /* DB not available — fall through to env defaults */ }
   const fromEnv = (process.env.RECIPIENT_EMAIL || '').trim();
   if (fromEnv) ctx.email = fromEnv;
-  if (!ctx.email) ctx.email = (process.env.SMTP_USER || '').trim() || null;
+  if (!ctx.email) ctx.email = getMainFromAddress() || null;
   return ctx;
 }
 
@@ -109,7 +128,7 @@ function customerEmail(sub, ctx) {
         </tr></table>` : ''}
         <p style="margin:26px 0 0;font-size:13px;color:#94a3b8;text-align:center">
           Didn't submit this form? You can ignore this email — or
-          <a href="mailto:${esc(ctx.email || process.env.SMTP_USER || '')}" style="color:#0077b6">let us know</a>.
+          <a href="mailto:${esc(ctx.email || getMainFromAddress())}" style="color:#0077b6">let us know</a>.
         </p>
       </div>
       <div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:18px 32px;text-align:center">
@@ -192,7 +211,7 @@ async function sendContactEmails(sub) {
   const ctx = await resolveContactContext();
   result.recipient = ctx.email;
 
-  const from = `"Menos iT Consult" <${process.env.SMTP_USER}>`;
+  const from = `"Menos iT Consult" <${getMainFromAddress()}>`;
   const customer = customerEmail(sub, ctx);
   const admin = adminEmail(sub);
 
@@ -323,7 +342,7 @@ async function sendTipEmails({ subject, message, testOnly = false }) {
   if (!recipients.length) { result.error = 'No recipients'; return result; }
   result.total = recipients.length;
 
-  const from = `"Menos iT Consult" <${process.env.SMTP_USER}>`;
+  const from = `"Menos iT Consult" <${getMainFromAddress()}>`;
   const BATCH = 5;
   for (let i = 0; i < recipients.length; i += BATCH) {
     await Promise.all(recipients.slice(i, i + BATCH).map((sub) => {
@@ -407,7 +426,7 @@ async function sendWelcomeEmail(sub) {
   const mail = welcomeEmail(sub);
   try {
     await transporter.sendMail({
-      from: `"Menos iT Consult" <${process.env.SMTP_USER}>`,
+      from: `"Menos iT Consult" <${getMainFromAddress()}>`,
       to: sub.email,
       subject: mail.subject,
       html: mail.html,
@@ -421,7 +440,41 @@ async function sendWelcomeEmail(sub) {
   return result;
 }
 
-module.exports = { sendContactEmails, sendWelcomeEmail, resolveContactContext, getTransporter, sendTipEmails };
+function escapeEmailHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+async function sendInstructorInvitationEmail({ to, name, setupUrl }) {
+  const transporter = getAcademyTransporter();
+  if (!transporter) return { ok: false, error: 'Academy SMTP is not configured.' };
+
+  const safeName = escapeEmailHtml(name);
+  const safeUrl = escapeEmailHtml(setupUrl);
+  await transporter.sendMail({
+    from: `"MITA Academy" <${process.env.ACADEMY_SMTP_FROM || 'academy@menositconsult.com'}>`,
+    to,
+    subject: 'Set up your MITA Academy instructor account',
+    text: `Hello ${name},\n\nAn Academy administrator invited you to become an instructor. Set up your account within 7 days:\n${setupUrl}\n\nIf you were not expecting this invitation, you can ignore this email.`,
+    html: `<p>Hello ${safeName},</p><p>An Academy administrator invited you to become an instructor.</p><p><a href="${safeUrl}">Set up your account</a>. This link expires in 7 days and can only be used once.</p><p>If you were not expecting this invitation, you can ignore this email.</p>`,
+  });
+  return { ok: true };
+}
+
+module.exports = {
+  sendContactEmails,
+  sendWelcomeEmail,
+  resolveContactContext,
+  getMainFromAddress,
+  getTransporter,
+  getAcademyTransporter,
+  sendTipEmails,
+  sendInstructorInvitationEmail,
+};
 
 
 

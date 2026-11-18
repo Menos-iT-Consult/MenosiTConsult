@@ -75,7 +75,7 @@ router.post('/', async (req, res) => {
   // Neither storage nor email succeeded — be honest with the visitor.
   const reason = mail.admin.error || mail.customer.error || 'delivery error';
   return res.status(500).json({
-    error: `Sorry, your message could not be delivered right now (${reason}). Please email us directly at ${mail.recipient || process.env.SMTP_USER || 'our support address'}.`,
+    error: `Sorry, your message could not be delivered right now (${reason}). Please email us directly at ${mail.recipient || mailer.getMainFromAddress()}.`,
   });
 });
 

@@ -68,7 +68,7 @@ export async function POST(request) {
   const reason = mail.admin.error || mail.customer.error || 'delivery error';
   return NextResponse.json(
     {
-      error: `Sorry, your message could not be delivered right now (${reason}). Please email us directly at ${mail.recipient || process.env.SMTP_USER || 'our support address'}.`,
+      error: `Sorry, your message could not be delivered right now (${reason}). Please email us directly at ${mail.recipient || mailer.getMainFromAddress()}.`,
     },
     { status: 500 }
   );

@@ -1,26 +1,27 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 function InstructorLoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Check if already logged in
-    fetch('/api/academy/staff/me', { credentials: 'include' })
+    fetch('/api/academy/staff/auth/me', { credentials: 'include' })
       .then((res) => res.json())
       .then((data) => {
         if (data.loggedIn) {
-          const url = new URL('/instructor', window.location.origin);
-          window.location.href = url;
+          router.replace(data.staff?.role === 'admin'
+            ? '/academy/admin/announcements'
+            : '/instructor/dashboard');
         }
       })
       .catch(() => {});
-  }, []);
+  }, [router]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -38,8 +39,16 @@ function InstructorLoginPage() {
       const data = await res.json();
 
       if (res.ok) {
-        const url = new URL('/instructor', window.location.origin);
-        window.location.href = url;
+        if (data.role !== 'instructor') {
+          await fetch('/api/academy/staff/auth/logout', {
+            method: 'POST',
+            credentials: 'include',
+          });
+          setError('This account does not have instructor access.');
+          setLoading(false);
+          return;
+        }
+        router.replace('/instructor/dashboard');
       } else {
         setError(data.error || 'Login failed');
         setLoading(false);
@@ -120,7 +129,7 @@ function InstructorLoginPage() {
       </form>
 
       <p style={{ marginTop: '1rem', fontSize: '.87rem', color: '#64748b' }}>
-        Don't have an account? <a href="/instructor/register" style={{ color: 'var(--blue)' }}>Register</a>
+        Instructor accounts are issued by Academy administrators. Use the setup link in your invitation email.
       </p>
     </div>
   );
