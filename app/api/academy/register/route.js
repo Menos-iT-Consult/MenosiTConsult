@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 
 const academy = require('../../../../backend/academy-db');
 const { noDbErrorResponse } = require('../../../../lib/api-helpers');
+const { isCountry, isGender } = require('../../../../lib/academy-registration');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const GENDERS = new Set(['Female', 'Male', 'Non-binary', 'Another identity']);
 const QUALIFICATIONS = new Set([
   'Secondary school',
   'Professional certificate',
@@ -16,8 +16,8 @@ const QUALIFICATIONS = new Set([
 ]);
 
 // Public: submit an application to the IT Academy.
-// Creates a 'pending' student; admission (with Student ID + credentials) is
-// done by academy staff, after which the student receives email + SMS.
+// Creates a 'pending' student; staff admission issues credentials and sends
+// the Student ID and temporary password to the applicant by SMS.
 export async function POST(request) {
   const payload = await request.json().catch(() => ({}));
   const body = payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : {};
@@ -48,13 +48,14 @@ export async function POST(request) {
     ['First name', firstName],
     ['Last name', lastName],
     ['Date of birth', dateOfBirth],
-    ['Nationality', nationality],
+    ['Country', nationality],
+    ['Gender', gender],
     ['Email', email],
     ['Phone number', phone],
     ['Residential address', address],
     ['City or town', city],
     ['Region or state', region],
-    ['Country', country],
+    ['Country of residence', country],
     ['Highest qualification', highestQualification],
     ['School, college, or institution', institution],
     ['Program', programId],
@@ -82,8 +83,14 @@ export async function POST(request) {
   if (guardianPhone && guardianPhone.replace(/\D/g, '').length < 9) {
     return NextResponse.json({ error: 'Please provide a valid emergency contact phone number.' }, { status: 400 });
   }
-  if (gender && !GENDERS.has(gender)) {
-    return NextResponse.json({ error: 'Please choose a valid gender option.' }, { status: 400 });
+  if (!isCountry(nationality)) {
+    return NextResponse.json({ error: 'Please choose a valid country.' }, { status: 400 });
+  }
+  if (!isCountry(country)) {
+    return NextResponse.json({ error: 'Please choose a valid country of residence.' }, { status: 400 });
+  }
+  if (!isGender(gender)) {
+    return NextResponse.json({ error: 'Please choose Male or Female.' }, { status: 400 });
   }
   if (!QUALIFICATIONS.has(highestQualification)) {
     return NextResponse.json({ error: 'Please choose a valid qualification.' }, { status: 400 });
@@ -98,13 +105,13 @@ export async function POST(request) {
     ['First name', firstName, 100],
     ['Middle name', middleName, 100],
     ['Last name', lastName, 100],
-    ['Nationality', nationality, 100],
+    ['Country', nationality, 100],
     ['Email', email, 254],
     ['Phone number', phone, 30],
     ['Residential address', address, 300],
     ['City or town', city, 100],
     ['Region or state', region, 100],
-    ['Country', country, 100],
+    ['Country of residence', country, 100],
     ['Emergency contact name', guardianName, 150],
     ['Emergency contact relationship', guardianRelationship, 80],
     ['Emergency contact phone', guardianPhone, 30],
@@ -170,7 +177,7 @@ export async function POST(request) {
         program: program.name,
       },
       message:
-        'Application received. Once the admissions office reviews it, you will get your Student ID by email and SMS.',
+        'Application received. Once the admissions office reviews it, you will get your Student ID by SMS.',
     });
   } catch (err) {
     const noDb = noDbErrorResponse(err);

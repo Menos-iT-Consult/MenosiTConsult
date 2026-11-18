@@ -226,6 +226,7 @@ export default function AcademyInstructorAdminPage() {
             <p>Issue invitations, moderate access, and assign courses.</p>
           </div>
           <div className="ap-actions">
+            <Link className="ap-button" href="/academy/admin/admissions">Admissions</Link>
             <Link className="ap-button" href="/academy/admin/announcements">Announcements</Link>
             <button className="ap-button" onClick={signOut}>Sign out</button>
           </div>

@@ -3,6 +3,10 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
+import academyRegistration from '@/lib/academy-registration';
+
+const { COUNTRIES } = academyRegistration;
+
 const STEPS = [
   { label: 'Personal', title: 'Personal details', description: 'Enter your legal name and identity details.' },
   { label: 'Contact', title: 'Contact information', description: 'Tell us how to reach you and where you live.' },
@@ -147,7 +151,7 @@ export default function AcademyApplicationPage() {
       rows: [
         ['Full name', [form.firstName, form.middleName, form.lastName].filter(Boolean).join(' ')],
         ['Date of birth', formatDate(form.dateOfBirth)],
-        ['Nationality', form.nationality],
+        ['Country', form.nationality],
         ['Gender', form.gender],
       ],
     },
@@ -157,7 +161,8 @@ export default function AcademyApplicationPage() {
       rows: [
         ['Email', form.email],
         ['Phone', form.phone],
-        ['Address', [form.address, form.city, form.region, form.country].filter(Boolean).join(', ')],
+        ['Address', [form.address, form.city, form.region].filter(Boolean).join(', ')],
+        ['Country of residence', form.country],
         ['Emergency contact', [form.guardianName, form.guardianRelationship, form.guardianPhone].filter(Boolean).join(' · ')],
       ],
     },
@@ -325,25 +330,26 @@ export default function AcademyApplicationPage() {
                     </div>
                     <div className="academy-form-row">
                       <label>
-                        Nationality <span>*</span>
-                        <input
+                        Country <span>*</span>
+                        <select
                           name="nationality"
                           autoComplete="country-name"
                           value={form.nationality}
                           onChange={updateField}
-                          placeholder="e.g. Ghanaian"
-                          maxLength={100}
                           required
-                        />
+                        >
+                          <option value="">Choose a country</option>
+                          {COUNTRIES.map((country) => (
+                            <option key={country} value={country}>{country}</option>
+                          ))}
+                        </select>
                       </label>
                       <label>
-                        Gender <span className="academy-optional-label">Optional</span>
-                        <select name="gender" value={form.gender} onChange={updateField}>
-                          <option value="">Prefer not to say</option>
+                        Gender <span>*</span>
+                        <select name="gender" value={form.gender} onChange={updateField} required>
+                          <option value="">Choose a gender</option>
                           <option value="Female">Female</option>
                           <option value="Male">Male</option>
-                          <option value="Non-binary">Non-binary</option>
-                          <option value="Another identity">Another identity</option>
                         </select>
                       </label>
                     </div>
@@ -415,15 +421,19 @@ export default function AcademyApplicationPage() {
                       </label>
                     </div>
                     <label>
-                      Country <span>*</span>
-                      <input
+                      Country of residence <span>*</span>
+                      <select
                         name="country"
                         autoComplete="country-name"
                         value={form.country}
                         onChange={updateField}
-                        maxLength={100}
                         required
-                      />
+                      >
+                        <option value="">Choose a country</option>
+                        {COUNTRIES.map((country) => (
+                          <option key={country} value={country}>{country}</option>
+                        ))}
+                      </select>
                     </label>
                     <div className="academy-form-subsection">
                       <div>

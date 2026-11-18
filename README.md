@@ -81,6 +81,8 @@ node server.js    # API only, on PORT (default 3000)
 | `SMTP_FROM` | optional | Visible From address for main-site email; defaults to `support@menositconsult.com` |
 | `ACADEMY_SMTP_HOST` / `ACADEMY_SMTP_PORT` / `ACADEMY_SMTP_USER` / `ACADEMY_SMTP_PASS` | for Academy email | Independent Nodemailer transport for Academy instructor invitations; does not fall back to main-site SMTP |
 | `ACADEMY_SMTP_FROM` | optional | Visible From address for Academy email; defaults to `academy@menositconsult.com` |
+| `ACADEMY_MNOTIFY_API_KEY` | for admission SMS | Private API key for the Academy's mNotify SMS integration |
+| `ACADEMY_MNOTIFY_SENDER` | for admission SMS | mNotify-approved sender ID, up to 11 characters |
 | `SITE_URL` | optional | Public base URL used in instructor setup invitation links; defaults to the request origin |
 | `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET` | for main-site media | Main-site Cloudflare R2 credentials and bucket |
 | `ACADEMY_R2_BUCKET` | optional | Separate Academy R2 bucket; must differ from `R2_BUCKET` and does not fall back to it |
@@ -101,9 +103,22 @@ node server.js    # API only, on PORT (default 3000)
 ## MITA Academy instructor portal
 
 Academy administrators sign in at `/academy/admin/login` and manage instructors
-at `/academy/admin/instructors`. Admins can create courses, issue instructor
-accounts, create academic sessions, assign courses, and deactivate or reactivate
-active instructors.
+at `/academy/admin/instructors` and review student applications at
+`/academy/admin/admissions`. Approving an application activates the student
+account, issues a Student ID, and sends that ID and its temporary password to
+the applicant by mNotify SMS. The student must change the password at first
+sign-in. Failed SMS deliveries are recorded and can be retried from the
+admissions page without approving the student again.
+
+Set `ACADEMY_MNOTIFY_API_KEY` and an mNotify-approved
+`ACADEMY_MNOTIFY_SENDER` before approving applications; missing SMS settings
+block approval. The sender ID must be 11 characters or fewer. Admission SMS
+uses mNotify's Quick SMS endpoint for Ghana numbers; international recipients
+require an approved mNotify international template and are not currently sent
+through this flow. See the [mNotify/BMS API documentation](https://developer.bms.africa/).
+
+Admins can also create courses, issue instructor accounts, create academic
+sessions, assign courses, and deactivate or reactivate active instructors.
 
 An issued instructor account starts pending. The Academy emails a single-use
 setup link that expires after seven days; setting a password activates the
@@ -155,6 +170,7 @@ operations without changing main-site uploads.
 | `/admin` | Admin dashboard (redirects to `/admin/login` when signed out) |
 | `/admin/login` | Admin login page |
 | `/academy/admin/login` | MITA Academy administrator login |
+| `/academy/admin/admissions` | Review applications, approve admissions, and retry failed SMS |
 | `/academy/admin/instructors` | Academy instructor accounts and course assignments |
 | `/instructor/login` | MITA Academy instructor login |
 | `/instructor/dashboard` | Instructor teaching dashboard |
@@ -262,6 +278,8 @@ Set these in **Project → Settings → Environment Variables**:
 | `SMTP_PASS` | Gmail App Password |
 | `SMTP_FROM` | `support@menositconsult.com` |
 | `RECIPIENT_EMAIL` | where enquiries are delivered |
+| `ACADEMY_MNOTIFY_API_KEY` | private mNotify API key for admission SMS |
+| `ACADEMY_MNOTIFY_SENDER` | mNotify-approved sender ID, up to 11 characters |
 | `ADMIN_PASSWORD` | the admin password to seed (see step 4) |
 | `ACADEMY_ADMIN_EMAIL` | `academy@menositconsult.com` or your chosen first-admin email |
 | `ACADEMY_ADMIN_PASSWORD` | a unique, strong password for the first Academy admin |
@@ -295,7 +313,8 @@ node migrate.js
 
 1. Create a VM (Ubuntu 22.04+), install Node.js 20+ and PostgreSQL
 2. Clone the repo and run `npm install` at the project root
-3. Set `POSTGRES_URL`, `ACADEMY_DATABASE_URL`, `SESSION_SECRET`, SMTP vars, `ADMIN_PASSWORD`,
+3. Set `POSTGRES_URL`, `ACADEMY_DATABASE_URL`, `SESSION_SECRET`, SMTP vars,
+   `ACADEMY_MNOTIFY_API_KEY`, `ACADEMY_MNOTIFY_SENDER`, `ADMIN_PASSWORD`,
    `ACADEMY_ADMIN_EMAIL` and `ACADEMY_ADMIN_PASSWORD`
 4. Build and run the Next.js app behind Nginx/PM2:
    ```bash

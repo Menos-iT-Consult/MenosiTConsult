@@ -309,19 +309,56 @@ async function setStudentStatus(id, status) {
  * the Student ID as the default password and flags must_change_password so the
  * portal forces the change-password guide on first login.
  */
-async function admitStudent(id, { studentId, seq, programId }) {
+async function admitStudent(id, { year = new Date().getFullYear() } = {}) {
   const bcrypt = require('bcryptjs');
-  const { rows } = await q(
-    `UPDATE academy_students
-        SET student_id = $2, seq = $3, program_id = COALESCE($4, program_id),
-            status = 'active',
-            password_hash = $5,
-            must_change_password = true,
-            admitted_at = now()
-      WHERE id = $1 RETURNING *`,
-    [id, studentId, seq, programId, bcrypt.hashSync(studentId, 12)]
-  );
-  return rows[0] ? mapStudent(rows[0]) : null;
+  return transaction(async (client) => {
+    const { rows: studentRows } = await client.query(
+      'SELECT * FROM academy_students WHERE id = $1 FOR UPDATE',
+      [id]
+    );
+    const applicant = studentRows[0];
+    if (!applicant || applicant.status !== 'pending') return null;
+    if (!applicant.program_id) {
+      const error = new Error('The applicant must be assigned to a program before admission.');
+      error.code = 'ADMISSION_PROGRAM_REQUIRED';
+      throw error;
+    }
+
+    const { rows: programRows } = await client.query(
+      'SELECT id, code FROM academy_programs WHERE id = $1 FOR UPDATE',
+      [applicant.program_id]
+    );
+    const program = programRows[0];
+    const programCode = String(program?.code || '').trim().toUpperCase();
+    if (!/^[A-Z0-9][A-Z0-9-]{0,19}$/.test(programCode)) {
+      const error = new Error('The applicant program needs a valid program code before admission.');
+      error.code = 'ADMISSION_PROGRAM_CODE_INVALID';
+      throw error;
+    }
+
+    const admissionYear = Number(year);
+    if (!Number.isInteger(admissionYear) || admissionYear < 2000 || admissionYear > 9999) {
+      throw new Error('Admission year must be a four-digit year.');
+    }
+    const prefix = `MITA/${programCode}-${admissionYear}-%`;
+    const { rows: sequenceRows } = await client.query(
+      `SELECT COALESCE(MAX(seq), 0) AS max_seq
+         FROM academy_students
+        WHERE program_id = $1 AND student_id LIKE $2`,
+      [applicant.program_id, prefix]
+    );
+    const seq = Number(sequenceRows[0].max_seq) + 1;
+    const studentId = `MITA/${programCode}-${admissionYear}-${String(seq).padStart(4, '0')}`;
+    const { rows } = await client.query(
+      `UPDATE academy_students
+          SET student_id = $2, seq = $3, status = 'active',
+              password_hash = $4, must_change_password = true, admitted_at = now()
+        WHERE id = $1 AND status = 'pending'
+        RETURNING *`,
+      [id, studentId, seq, bcrypt.hashSync(studentId, 12)]
+    );
+    return rows[0] ? mapStudent(rows[0]) : null;
+  });
 }
 
 async function updateStudentPassword(id, hash) {
@@ -1714,6 +1751,30 @@ async function listNotifications(studentId) {
   return rows.map(mapNotification);
 }
 
+async function listFailedAdmissionSms() {
+  const { rows } = await q(
+    `SELECT s.*, latest.error AS sms_error, latest.created_at AS sms_failed_at
+       FROM academy_students s
+       JOIN LATERAL (
+         SELECT status, error, created_at
+           FROM academy_notifications
+          WHERE student_id = s.id AND channel = 'sms' AND type = 'admission_approved'
+          ORDER BY created_at DESC
+          LIMIT 1
+       ) latest ON true
+      WHERE s.status = 'active'
+        AND s.must_change_password = true
+        AND latest.status = 'failed'
+      ORDER BY latest.created_at DESC
+      LIMIT 100`
+  );
+  return rows.map((row) => ({
+    ...mapStudent(row),
+    smsError: row.sms_error || '',
+    smsFailedAt: iso(row.sms_failed_at),
+  }));
+}
+
 async function listAnnouncements({ publishedOnly = false } = {}) {
   const { rows } = publishedOnly
     ? await q('SELECT * FROM academy_announcements WHERE published = true ORDER BY created_at DESC')
@@ -1885,7 +1946,7 @@ module.exports = {
   // invoices
   listInvoices, getInvoice, createInvoice, updateInvoice, deleteInvoice,
   // notifications
-  logNotification, listNotifications, listAnnouncements, createAnnouncement,
+  logNotification, listNotifications, listFailedAdmissionSms, listAnnouncements, createAnnouncement,
   // settings
   getAcademySetting, setAcademySetting,
 };
