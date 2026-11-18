@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import PasswordInput from '@/app/components/PasswordInput';
 
 function InstructorLoginPage() {
   const router = useRouter();
@@ -92,10 +93,9 @@ function InstructorLoginPage() {
           <label htmlFor="password" style={{ display: 'block', marginBottom: '0.5rem' }}>
             Password
           </label>
-          <input
+          <PasswordInput
             id="password"
             name="password"
-            type="password"
             style={{
               width: '100%',
               padding: '10px',

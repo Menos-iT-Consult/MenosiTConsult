@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import PasswordInput from '@/app/components/PasswordInput';
 
 export default function ChangePasswordPage() {
   const router = useRouter();
@@ -57,20 +58,18 @@ export default function ChangePasswordPage() {
         {success && <div className="ap-success" role="status">{success}</div>}
         <form className="ap-login-form" onSubmit={handleSubmit}>
           <label htmlFor="current-password">Current password</label>
-          <input
+          <PasswordInput
             id="current-password"
             className="ap-input"
-            type="password"
             autoComplete="current-password"
             value={currentPassword}
             onChange={(event) => setCurrentPassword(event.target.value)}
             required
           />
           <label htmlFor="new-password">New password</label>
-          <input
+          <PasswordInput
             id="new-password"
             className="ap-input"
-            type="password"
             autoComplete="new-password"
             minLength={8}
             value={newPassword}
@@ -78,10 +77,9 @@ export default function ChangePasswordPage() {
             required
           />
           <label htmlFor="confirm-password">Confirm new password</label>
-          <input
+          <PasswordInput
             id="confirm-password"
             className="ap-input"
-            type="password"
             autoComplete="new-password"
             minLength={8}
             value={confirmPassword}

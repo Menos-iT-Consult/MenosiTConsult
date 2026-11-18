@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import PasswordInput from '@/app/components/PasswordInput';
 
 export default function InstructorSetupPage() {
   const [token, setToken] = useState('');
@@ -59,10 +60,9 @@ export default function InstructorSetupPage() {
         ) : (
           <form onSubmit={handleSubmit} className="ap-login-form">
             <label htmlFor="instructor-password">Password</label>
-            <input
+            <PasswordInput
               id="instructor-password"
               className="ap-input"
-              type="password"
               autoComplete="new-password"
               minLength={8}
               maxLength={200}
@@ -71,10 +71,9 @@ export default function InstructorSetupPage() {
               required
             />
             <label htmlFor="instructor-confirm-password">Confirm password</label>
-            <input
+            <PasswordInput
               id="instructor-confirm-password"
               className="ap-input"
-              type="password"
               autoComplete="new-password"
               minLength={8}
               maxLength={200}

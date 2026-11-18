@@ -23,25 +23,25 @@ export default function HomePage() {
         </div>
         <div className="container hero-content">
           <div className="hero-text">
-            <div className="hero-badge reveal">Trusted IT Partner · Agona, Ghana</div>
-            <h1 className="reveal">
+            <Reveal as="div" className="hero-badge">Trusted IT Partner · Agona, Ghana</Reveal>
+            <Reveal as="h1">
               Empowering Your Business
               <br />
               <span className="highlight">Through Technology</span>
-            </h1>
-            <p className="hero-sub reveal">
+            </Reveal>
+            <Reveal as="p" className="hero-sub">
               Transform your business with expert IT consulting services. We help small
               businesses stay competitive, secure, and ahead of the curve.
-            </p>
-            <div className="hero-actions reveal">
+            </Reveal>
+            <Reveal as="div" className="hero-actions">
               <a href="tel:+233549128384" className="btn btn-primary">
                 Call Now
               </a>
               <Link href="/services" className="btn btn-ghost">
                 Our Services
               </Link>
-            </div>
-            <div className="hero-stats reveal">
+            </Reveal>
+            <Reveal as="div" className="hero-stats">
               <div className="hstat">
                 <Stat statKey="clients" fallback={150} />
                 <span>+</span>
@@ -59,9 +59,9 @@ export default function HomePage() {
                 <span>%</span>
                 <p>Satisfaction rate</p>
               </div>
-            </div>
+            </Reveal>
           </div>
-          <div className="hero-visual reveal">
+          <Reveal as="div" className="hero-visual">
             <Link href="/services" className="hero-card hc-1">
               <div className="hc-icon">
                 <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -100,7 +100,7 @@ export default function HomePage() {
               <p className="hc-label">24/7 Support</p>
               <p className="hc-sub">Remote &amp; on-site helpdesk</p>
             </Link>
-          </div>
+          </Reveal>
         </div>
         <div className="hero-scroll">
           <span>Scroll down</span>
@@ -117,16 +117,16 @@ export default function HomePage() {
       {/* QUICK INTRO */}
       <section className="section quick-intro">
         <div className="container">
-          <div className="section-label reveal">Who We Are</div>
-          <h2 className="section-title reveal">
+          <Reveal as="div" className="section-label">Who We Are</Reveal>
+          <Reveal as="h2" className="section-title">
             Technology that works for your business
-          </h2>
-          <p className="section-sub reveal">
+          </Reveal>
+          <Reveal as="p" className="section-sub">
             Based in Agona, Western Ghana, Menos iT Consult has been helping small
             businesses grow through smart, reliable technology since 2012.
-          </p>
+          </Reveal>
           <div className="preview-grid">
-            <Link href="/about" className="preview-card reveal">
+            <Reveal as={Link} href="/about" className="preview-card">
               <div className="preview-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -141,8 +141,8 @@ export default function HomePage() {
                 excellence every day.
               </p>
               <span className="preview-link">Learn more →</span>
-            </Link>
-            <Link href="/services" className="preview-card reveal">
+            </Reveal>
+            <Reveal as={Link} href="/services" className="preview-card">
               <div className="preview-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="2" y="3" width="20" height="14" rx="2" />
@@ -155,8 +155,8 @@ export default function HomePage() {
                 IT solutions we offer.
               </p>
               <span className="preview-link">Explore services →</span>
-            </Link>
-            <Link href="/testimonials" className="preview-card reveal">
+            </Reveal>
+            <Reveal as={Link} href="/testimonials" className="preview-card">
               <div className="preview-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -168,8 +168,8 @@ export default function HomePage() {
                 delivered for their businesses.
               </p>
               <span className="preview-link">Read reviews →</span>
-            </Link>
-            <Link href="/portfolio" className="preview-card reveal">
+            </Reveal>
+            <Reveal as={Link} href="/portfolio" className="preview-card">
               <div className="preview-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="2" y="7" width="20" height="14" rx="2" />
@@ -184,8 +184,8 @@ export default function HomePage() {
                 rollouts, cloud migrations, and more.
               </p>
               <span className="preview-link">See our work →</span>
-            </Link>
-            <Link href="/contact" className="preview-card preview-card--cta reveal">
+            </Reveal>
+            <Reveal as={Link} href="/contact" className="preview-card preview-card--cta">
               <div className="preview-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
@@ -198,7 +198,7 @@ export default function HomePage() {
                 within one business day.
               </p>
               <span className="preview-link">Get in touch →</span>
-            </Link>
+            </Reveal>
           </div>
         </div>
       </section>
@@ -206,7 +206,7 @@ export default function HomePage() {
       {/* PULL QUOTE */}
       <section className="home-quote">
         <div className="container">
-          <blockquote className="reveal">
+          <Reveal as="blockquote">
             <svg className="quote-mark" viewBox="0 0 40 28" fill="currentColor">
               <path d="M0 28V17.2C0 9.87 4.6 4.27 13.8 0l2.4 3.6C10.87 5.73 8.13 9 7.6 13.6H14V28H0zm22 0V17.2C22 9.87 26.6 4.27 35.8 0l2.4 3.6C32.87 5.73 30.13 9 29.6 13.6H36V28H22z" />
             </svg>
@@ -215,17 +215,17 @@ export default function HomePage() {
               went from constant downtime to zero interruptions in six months.&quot;
             </p>
             <cite>— Baffour Kofi, Owner, KAB Enterprises</cite>
-          </blockquote>
-          <Link href="/testimonials" className="btn btn-ghost reveal">
+          </Reveal>
+          <Reveal as={Link} href="/testimonials" className="btn btn-ghost">
             Read all testimonials
-          </Link>
+          </Reveal>
         </div>
       </section>
 
       {/* CTA BAND */}
       <section className="cta-band">
         <div className="container">
-          <div className="cta-band-inner reveal">
+          <Reveal as="div" className="cta-band-inner">
             <div>
               <h2>Ready to transform your business?</h2>
               <p>Let&apos;s talk about what technology can do for you.</p>
@@ -233,7 +233,7 @@ export default function HomePage() {
             <Link href="/contact" className="btn btn-white">
               Start a conversation
             </Link>
-          </div>
+          </Reveal>
         </div>
       </section>
     </>

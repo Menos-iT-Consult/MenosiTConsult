@@ -89,6 +89,9 @@ export async function middleware(request) {
     if (academyDbConfigError) {
       return NextResponse.json({ error: academyDbConfigError }, { status: 503 });
     }
+    if (pathname === '/api/academy/programs') {
+      return NextResponse.next();
+    }
   }
 
   // ── Academy Admin (MITA staff) ────────────────────────────────────────────

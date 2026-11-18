@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import PasswordInput from '@/app/components/PasswordInput';
 
 export default function AcademyAdminLoginPage() {
   const router = useRouter();
@@ -59,10 +60,9 @@ export default function AcademyAdminLoginPage() {
             required
           />
           <label htmlFor="admin-password">Password</label>
-          <input
+          <PasswordInput
             id="admin-password"
             className="ap-input"
-            type="password"
             autoComplete="current-password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}

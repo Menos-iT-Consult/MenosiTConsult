@@ -263,6 +263,34 @@ ul { list-style: none; }
 .form-group textarea:focus {
   border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,119,182,.1);
 }
+.password-field {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+.password-field-input { padding-right: 2.75rem; }
+.password-field-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+}
+.password-field-toggle:hover { color: var(--blue); }
+.password-field-toggle:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
+}
+.password-field-toggle svg { width: 18px; height: 18px; }
 .form-group textarea { resize: vertical; min-height: 100px; }
 .form-success {
   display: none; align-items: center; gap: 10px;
