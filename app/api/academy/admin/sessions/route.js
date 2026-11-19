@@ -13,6 +13,20 @@ function validDate(value) {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
+export async function GET(request) {
+  try {
+    const gate = await staffAuth.requireAdministrator(request);
+    if (gate.error) return NextResponse.json({ error: gate.error }, { status: gate.status });
+    const sessions = await academy.listSessions();
+    return NextResponse.json(sessions);
+  } catch (err) {
+    const noDb = noDbErrorResponse(err);
+    if (noDb) return noDb;
+    console.error('Academy admin sessions list error:', err);
+    return NextResponse.json({ error: 'Could not load Academy sessions.' }, { status: 500 });
+  }
+}
+
 export async function POST(request) {
   try {
     const gate = await staffAuth.requireAdministrator(request);

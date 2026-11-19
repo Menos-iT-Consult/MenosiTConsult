@@ -91,7 +91,9 @@ export async function middleware(request) {
     }
     if (
       pathname === '/api/academy/programs' ||
-      pathname === '/api/academy/register'
+      pathname === '/api/academy/register' ||
+      pathname.startsWith('/api/academy/admin/') ||
+      pathname.startsWith('/api/academy/staff/')
     ) {
       return NextResponse.next();
     }

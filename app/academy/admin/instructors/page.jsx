@@ -45,7 +45,7 @@ export default function AcademyInstructorAdminPage() {
       setStaff(staffResult.filter((member) => member.role === 'instructor'));
       setCourses(coursesResult.courses);
       setPrograms(coursesResult.programs);
-      const sessionsResponse = await fetch('/api/academy/sessions', { credentials: 'include' });
+      const sessionsResponse = await fetch('/api/academy/admin/sessions', { credentials: 'include' });
       const sessionsResult = await sessionsResponse.json();
       if (!sessionsResponse.ok) throw new Error(sessionsResult.error || 'Could not load Academy sessions.');
       setSessions(sessionsResult);
