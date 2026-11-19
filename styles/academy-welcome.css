@@ -653,12 +653,18 @@
 .academy-back-link:hover { color: var(--academy-blue); }
 .academy-application-layout {
   display: grid;
-  grid-template-columns: .8fr 1.2fr;
+  grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
   gap: 75px;
   align-items: start;
   padding-top: 72px;
   padding-bottom: 90px;
 }
+.academy-application-layout > *,
+.academy-application-card,
+.academy-application-form,
+.academy-form-step,
+.academy-form-row,
+.academy-form-row > * { min-width: 0; }
 .academy-application-aside { position: sticky; top: 40px; padding-top: 25px; }
 .academy-application-aside h1 { margin: 13px 0 17px; font-size: clamp(2.3rem, 4vw, 3.5rem); letter-spacing: -.05em; }
 .academy-application-aside > p:not(.academy-section-kicker) { color: var(--academy-muted); line-height: 1.75; }
@@ -892,6 +898,11 @@
   .academy-application-layout { gap: 40px; }
 }
 
+@media (max-width: 760px) {
+  .academy-application-layout { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+  .academy-application-aside { position: static; padding-top: 0; }
+}
+
 @media (max-width: 680px) {
   .academy-container { width: min(100% - 36px, 520px); }
   .academy-header-inner { min-height: 70px; gap: 12px; }
@@ -932,6 +943,12 @@
   .academy-application-aside h1 { font-size: 2.55rem; }
   .academy-application-card { padding: 24px 19px; }
   .academy-form-row { grid-template-columns: 1fr; }
+  .academy-application-form input,
+  .academy-application-form select,
+  .academy-application-form textarea { min-width: 0; font-size: 16px; }
+  .academy-application-form .academy-phone-field input { font-size: 16px; }
+  .academy-application-card,
+  .academy-policy-card { overflow-wrap: anywhere; }
   .academy-application-steps ol { gap: 3px; }
   .academy-step-label { font-size: .65rem; }
   .academy-step-number { width: 27px; height: 27px; }

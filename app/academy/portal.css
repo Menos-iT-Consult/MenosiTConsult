@@ -627,8 +627,27 @@
   .ap-nav-inner .ap-link { flex: 0 0 auto; padding: 8px 10px; font-size: .82rem; }
   .ap-nav-inner .ap-brand { flex: 0 0 auto; font-size: .88rem; }
   .ap-nav-inner .ap-signout { flex: 0 0 auto; padding: 7px 9px; font-size: .78rem; }
-  .ap-main { padding: 26px 18px 56px; }
-  .ap-card { padding: 20px; }
+  .ap-main { width: 100%; min-width: 0; padding: 26px 18px 56px; }
+  .ap-card { min-width: 0; padding: 20px; }
+  .ap-grid-2,
+  .ap-defs,
+  .ap-form-grid,
+  .ap-profile-grid,
+  .ap-attendance-filter,
+  .ap-stat-grid,
+  .ap-metric-grid,
+  .ap-course-grid { grid-template-columns: minmax(0, 1fr); }
+  .ap-input,
+  .ap-select,
+  .ap-textarea { min-width: 0; font-size: 16px; }
+  .ap-auth { width: 100%; min-width: 0; padding: 24px 16px; }
+  .ap-auth-card { min-width: 0; padding: 26px 20px; }
+  .ap-login-form,
+  .ap-announcement-form,
+  .ap-form-grid { min-width: 0; }
+  .ap-login-form > *,
+  .ap-announcement-form > *,
+  .ap-form-grid > * { min-width: 0; max-width: 100%; }
   .ap-day-entry { grid-template-columns: 1fr; gap: 6px; }
   .ap-work-heading, .ap-admin-heading { align-items: flex-start; flex-direction: column; }
   .ap-submission { grid-template-columns: 1fr; }

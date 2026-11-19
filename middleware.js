@@ -89,7 +89,10 @@ export async function middleware(request) {
     if (academyDbConfigError) {
       return NextResponse.json({ error: academyDbConfigError }, { status: 503 });
     }
-    if (pathname === '/api/academy/programs') {
+    if (
+      pathname === '/api/academy/programs' ||
+      pathname === '/api/academy/register'
+    ) {
       return NextResponse.next();
     }
   }
