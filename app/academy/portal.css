@@ -642,6 +642,14 @@
 .ap-course-meta { margin: 12px 0 0; }
 .ap-course-meta-large { margin: -8px 0 24px; }
 .ap-course-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
+.ap-course-enroll-control { display: grid; width: 100%; justify-items: start; gap: 8px; }
+.ap-course-card .ap-course-enroll-control .ap-button,
+.ap-course-enroll-control .ap-button { margin-top: 0; }
+.ap-course-enroll-control .ap-error { margin: 0; }
+.ap-course-start { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.ap-course-start h2 { margin: 0; }
+.ap-course-start p { margin: 8px 0 0; color: #64748b; line-height: 1.6; }
+.ap-course-start .ap-course-enroll-control { width: auto; flex: none; }
 .ap-button {
   display: inline-flex;
   align-items: center;
@@ -1001,6 +1009,8 @@
   .ap-instructor-course { align-items: flex-start; }
   .ap-instructor-course small { margin-left: 0; }
   .ap-id-card-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .ap-course-start { align-items: flex-start; flex-direction: column; }
+  .ap-course-start .ap-course-enroll-control { width: 100%; }
   .ap-program-edit .ap-form-grid { grid-template-columns: minmax(0, 1fr); }
 }
 

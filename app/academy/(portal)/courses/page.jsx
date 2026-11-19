@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import useStudentPortalData from '../useStudentPortalData';
+import EnrollCourseButton from './EnrollCourseButton';
 
 export default function CoursesPage() {
   const { data, loading, error, reload } = useStudentPortalData();
@@ -97,12 +98,7 @@ export default function CoursesPage() {
                 </div>
                 {course.instructorName && <p className="ap-muted">Instructor: {course.instructorName}</p>}
                 <div className="ap-course-actions">
-                  <Link
-                    className="ap-button"
-                    href={`/academy/courses/${encodeURIComponent(course.id)}`}
-                  >
-                    View course
-                  </Link>
+                  <EnrollCourseButton courseId={course.id} />
                 </div>
               </article>
             ))}

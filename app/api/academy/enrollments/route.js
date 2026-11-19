@@ -5,12 +5,90 @@ const auth = require('../../../../lib/academy-auth');
 const staffAuth = require('../../../../lib/academy-staff');
 const { sendStudentNotification } = require('../../../../lib/academy-notifications');
 const { noDbErrorResponse } = require('../../../../lib/api-helpers');
+const {
+  isStudentEligibleForCourse,
+  getCurrentCourseSession,
+} = require('../../../../lib/academy-enrollment');
 
 async function activeStudent(request) {
   const studentId = auth.getStudentId(request);
   if (!studentId) return null;
   const student = await academy.getStudent(studentId);
   return student && student.status === 'active' ? student : null;
+}
+
+async function enrollStudent(student, body) {
+  const courseId = typeof body?.courseId === 'string' ? body.courseId.trim() : '';
+  if (!courseId || courseId.length > 200) {
+    return NextResponse.json({ error: 'Choose a valid course to enroll in.' }, { status: 400 });
+  }
+  if (!student.programId) {
+    return NextResponse.json({ error: 'Your student account is not assigned to a program.' }, { status: 409 });
+  }
+
+  const [programCourses, sessions] = await Promise.all([
+    academy.listCourses({ programId: student.programId }),
+    academy.listSessions({ currentOnly: true }),
+  ]);
+  const course = programCourses.find((item) => item.id === courseId);
+  if (!isStudentEligibleForCourse(student, course)) {
+    return NextResponse.json({ error: 'This course is not available for your program.' }, { status: 404 });
+  }
+  const session = getCurrentCourseSession(sessions);
+  if (!session) {
+    return NextResponse.json(
+      { error: 'There is no current Academy session available for enrollment. Please contact the Academy administrator.' },
+      { status: 409 }
+    );
+  }
+
+  const { rows: existingRows } = await academy.q(
+    `SELECT * FROM academy_enrollments
+      WHERE student_id = $1 AND course_id = $2 AND session_id = $3`,
+    [student.id, course.id, session.id]
+  );
+  let enrollment = existingRows[0] || null;
+  let created = false;
+  let sendConfirmation = false;
+
+  if (enrollment && ['enrolled', 'active'].includes(enrollment.status)) {
+    return NextResponse.json(enrollment);
+  }
+  if (enrollment) {
+    enrollment = await academy.updateEnrollment(enrollment.id, { status: 'enrolled' });
+    sendConfirmation = true;
+  } else {
+    try {
+      enrollment = await academy.createEnrollment({
+        studentId: student.id,
+        courseId: course.id,
+        sessionId: session.id,
+      });
+      created = true;
+      sendConfirmation = true;
+    } catch (error) {
+      if (error.code !== '23505') throw error;
+      const { rows } = await academy.q(
+        `SELECT * FROM academy_enrollments
+          WHERE student_id = $1 AND course_id = $2 AND session_id = $3`,
+        [student.id, course.id, session.id]
+      );
+      if (!rows[0]) throw error;
+      return NextResponse.json(rows[0]);
+    }
+  }
+
+  const notifications = sendConfirmation
+    ? await sendStudentNotification(student, {
+        type: 'course_enrollment',
+        subject: `Course enrollment confirmed: ${course.title}`,
+        message: `You have been enrolled in ${course.title} for ${session.name}. Sign in to the MITA Academy portal to start your course.`,
+      })
+    : null;
+  return NextResponse.json(
+    { ...enrollment, notifications },
+    { status: created ? 201 : 200 }
+  );
 }
 
 export async function GET(request) {
@@ -52,6 +130,12 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
+    const currentStudent = await activeStudent(request);
+    if (currentStudent) {
+      const body = await request.json().catch(() => null);
+      return await enrollStudent(currentStudent, body);
+    }
+
     const gate = await staffAuth.requireAdministrator(request);
     if (gate.error) return NextResponse.json({ error: gate.error }, { status: gate.status });
     const body = await request.json().catch(() => ({}));

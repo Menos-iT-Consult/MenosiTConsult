@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import useStudentPortalData from '../../useStudentPortalData';
+import EnrollCourseButton from '../EnrollCourseButton';
 
 function safeResourceUrl(value) {
   return typeof value === 'string' && (/^https?:\/\//i.test(value) || /^\/(?!\/)/.test(value));
@@ -50,8 +51,12 @@ export default function CourseDetailsPage() {
         <span>Semester {programCourse.semesterNumber}</span>
         {programCourse.instructorName && <span>Instructor: {programCourse.instructorName}</span>}
       </div>
-      <div className="ap-card ap-empty">
-        <p>This course is part of your program. Class materials, assignments, and results will appear here when you are enrolled in a course session.</p>
+      <div className="ap-card ap-course-start">
+        <div>
+          <h2>Ready to start this course?</h2>
+          <p>This course will be added to your current Academy session. Enroll to open its learning materials, assignments, and results.</p>
+        </div>
+        <EnrollCourseButton courseId={courseId} onEnrolled={reload} />
       </div>
     </main>
     );
