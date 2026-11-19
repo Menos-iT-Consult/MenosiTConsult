@@ -20,6 +20,21 @@ const { verifySignedCookie } = require('./lib/signed-cookie-verification');
  */
 
 const COOKIE_NAME = 'admin_auth';
+const ACADEMY_API_HANDLER_PREFIXES = [
+  '/api/academy/admin/',
+  '/api/academy/auth/',
+  '/api/academy/instructor/',
+  '/api/academy/staff/',
+  '/api/academy/student/',
+];
+const ACADEMY_API_HANDLER_PATHS = new Set([
+  '/api/academy/assignments',
+  '/api/academy/enrollments',
+  '/api/academy/grades',
+  '/api/academy/programs',
+  '/api/academy/register',
+  '/api/academy/submissions',
+]);
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
@@ -30,11 +45,11 @@ export async function middleware(request) {
     if (academyDbConfigError) {
       return NextResponse.json({ error: academyDbConfigError }, { status: 503 });
     }
+    // Let Academy handlers return their own JSON auth responses instead of
+    // redirecting API calls to the site-admin login page.
     if (
-      pathname === '/api/academy/programs' ||
-      pathname === '/api/academy/register' ||
-      pathname.startsWith('/api/academy/admin/') ||
-      pathname.startsWith('/api/academy/staff/')
+      ACADEMY_API_HANDLER_PATHS.has(pathname) ||
+      ACADEMY_API_HANDLER_PREFIXES.some((prefix) => pathname.startsWith(prefix))
     ) {
       return NextResponse.next();
     }
