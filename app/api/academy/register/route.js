@@ -2,7 +2,13 @@ import { NextResponse } from 'next/server';
 
 const academy = require('../../../../backend/academy-db');
 const { noDbErrorResponse } = require('../../../../lib/api-helpers');
-const { isCountry, isGender } = require('../../../../lib/academy-registration');
+const {
+  getCountryRegions,
+  isCountry,
+  isGender,
+  isRegionForCountry,
+  normalizePhoneNumber,
+} = require('../../../../lib/academy-registration');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const QUALIFICATIONS = new Set([
@@ -33,7 +39,6 @@ export async function POST(request) {
   const address = text('address');
   const city = text('city');
   const region = text('region');
-  const country = text('country');
   const guardianName = text('guardianName');
   const guardianRelationship = text('guardianRelationship');
   const guardianPhone = text('guardianPhone');
@@ -54,8 +59,6 @@ export async function POST(request) {
     ['Phone number', phone],
     ['Residential address', address],
     ['City or town', city],
-    ['Region or state', region],
-    ['Country of residence', country],
     ['Highest qualification', highestQualification],
     ['School, college, or institution', institution],
     ['Program', programId],
@@ -77,17 +80,24 @@ export async function POST(request) {
   if (!EMAIL_RE.test(email)) {
     return NextResponse.json({ error: 'Please provide a valid email address.' }, { status: 400 });
   }
-  if (phone.replace(/\D/g, '').length < 9) {
-    return NextResponse.json({ error: 'Please provide a valid phone number (needed for your admission SMS).' }, { status: 400 });
-  }
-  if (guardianPhone && guardianPhone.replace(/\D/g, '').length < 9) {
-    return NextResponse.json({ error: 'Please provide a valid emergency contact phone number.' }, { status: 400 });
-  }
   if (!isCountry(nationality)) {
     return NextResponse.json({ error: 'Please choose a valid country.' }, { status: 400 });
   }
-  if (!isCountry(country)) {
-    return NextResponse.json({ error: 'Please choose a valid country of residence.' }, { status: 400 });
+  const normalizedPhone = normalizePhoneNumber(phone, nationality);
+  if (!normalizedPhone) {
+    return NextResponse.json({ error: 'Please provide a valid phone number for the selected country.' }, { status: 400 });
+  }
+  const normalizedGuardianPhone = guardianPhone
+    ? normalizePhoneNumber(guardianPhone, nationality)
+    : '';
+  if (guardianPhone && !normalizedGuardianPhone) {
+    return NextResponse.json({ error: 'Please provide a valid emergency contact phone number for the selected country.' }, { status: 400 });
+  }
+  if (getCountryRegions(nationality).length && !region) {
+    return NextResponse.json({ error: 'Please choose a region or state.' }, { status: 400 });
+  }
+  if (!isRegionForCountry(nationality, region)) {
+    return NextResponse.json({ error: 'Please choose a valid region or state for the selected country.' }, { status: 400 });
   }
   if (!isGender(gender)) {
     return NextResponse.json({ error: 'Please choose Male or Female.' }, { status: 400 });
@@ -111,7 +121,6 @@ export async function POST(request) {
     ['Residential address', address, 300],
     ['City or town', city, 100],
     ['Region or state', region, 100],
-    ['Country of residence', country, 100],
     ['Emergency contact name', guardianName, 150],
     ['Emergency contact relationship', guardianRelationship, 80],
     ['Emergency contact phone', guardianPhone, 30],
@@ -122,8 +131,8 @@ export async function POST(request) {
   if (tooLong) {
     return NextResponse.json({ error: `${tooLong[0]} must be ${tooLong[2]} characters or fewer.` }, { status: 400 });
   }
-  if (body.confirmAccuracy !== true || body.privacyConsent !== true) {
-    return NextResponse.json({ error: 'Please confirm your information and consent before submitting.' }, { status: 400 });
+  if (body.confirmAccuracy !== true || body.termsAccepted !== true || body.privacyConsent !== true) {
+    return NextResponse.json({ error: 'Please confirm your information and accept the Academy Terms and Conditions and Privacy Policy.' }, { status: 400 });
   }
 
   try {
@@ -153,14 +162,14 @@ export async function POST(request) {
       gender,
       nationality,
       email,
-      phone,
+      phone: normalizedPhone,
       address,
       city,
       region,
-      country,
+      country: '',
       guardianName,
       guardianRelationship,
-      guardianPhone,
+      guardianPhone: normalizedGuardianPhone,
       highestQualification,
       institution,
       fieldOfStudy,

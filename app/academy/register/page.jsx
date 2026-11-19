@@ -5,7 +5,12 @@ import { useEffect, useRef, useState } from 'react';
 
 import academyRegistration from '@/lib/academy-registration';
 
-const { COUNTRIES } = academyRegistration;
+const {
+  COUNTRIES,
+  getCountryCallingCode,
+  getCountryRegions,
+  normalizePhoneNumber,
+} = academyRegistration;
 
 const STEPS = [
   { label: 'Personal', title: 'Personal details', description: 'Enter your legal name and identity details.' },
@@ -27,7 +32,6 @@ const INITIAL_FORM = {
   address: '',
   city: '',
   region: '',
-  country: 'Ghana',
   guardianName: '',
   guardianRelationship: '',
   guardianPhone: '',
@@ -38,8 +42,25 @@ const INITIAL_FORM = {
   programId: '',
   studyReason: '',
   confirmAccuracy: false,
+  termsAccepted: false,
   privacyConsent: false,
 };
+
+async function readJsonResponse(response) {
+  const body = await response.text();
+  if (!body.trim()) {
+    throw new Error(`The server returned an empty response (HTTP ${response.status}). Please try again later.`);
+  }
+  try {
+    return JSON.parse(body);
+  } catch {
+    throw new Error(`The server returned an invalid response (HTTP ${response.status}). Please try again later.`);
+  }
+}
+
+function formatPhone(phone, callingCode) {
+  return [callingCode, phone.trim()].filter(Boolean).join(' ');
+}
 
 function displayValue(value) {
   return value || 'Not provided';
@@ -74,7 +95,7 @@ export default function AcademyApplicationPage() {
       setProgramsError('');
       try {
         const response = await fetch('/api/academy/programs', { signal: controller.signal });
-        const result = await response.json();
+        const result = await readJsonResponse(response);
         if (!response.ok) throw new Error('Could not load available programs.');
         if (!Array.isArray(result)) throw new Error('The available program list is invalid.');
         setPrograms(result);
@@ -93,17 +114,37 @@ export default function AcademyApplicationPage() {
   }, [programsRetry]);
 
   const selectedProgram = programs.find((program) => program.id === form.programId);
+  const countryCallingCode = getCountryCallingCode(form.nationality);
+  const countryRegions = getCountryRegions(form.nationality);
 
   function updateField(event) {
     const { name, type, value, checked } = event.target;
+    if (name === 'phone' || name === 'guardianPhone') {
+      event.target.setCustomValidity('');
+    }
     setForm((current) => ({
       ...current,
       [name]: type === 'checkbox' ? checked : value,
+      ...(name === 'nationality' ? { region: '' } : {}),
     }));
     setError('');
   }
 
   function continueToNextStep() {
+    if (step === 1) {
+      const phoneInput = formRef.current?.elements.namedItem('phone');
+      const guardianPhoneInput = formRef.current?.elements.namedItem('guardianPhone');
+      phoneInput?.setCustomValidity(
+        form.phone.trim() && !normalizePhoneNumber(form.phone, form.nationality)
+          ? 'Enter a valid phone number for the selected country.'
+          : ''
+      );
+      guardianPhoneInput?.setCustomValidity(
+        form.guardianPhone.trim() && !normalizePhoneNumber(form.guardianPhone, form.nationality)
+          ? 'Enter a valid emergency contact phone number for the selected country.'
+          : ''
+      );
+    }
     if (!formRef.current?.reportValidity()) return;
     setError('');
     setStep((current) => Math.min(current + 1, STEPS.length - 1));
@@ -124,9 +165,13 @@ export default function AcademyApplicationPage() {
       const response = await fetch('/api/academy/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          phone: normalizePhoneNumber(form.phone, form.nationality) || '',
+          guardianPhone: normalizePhoneNumber(form.guardianPhone, form.nationality) || '',
+        }),
       });
-      const result = await response.json();
+      const result = await readJsonResponse(response);
       if (!response.ok) {
         throw new Error(
           response.status >= 500
@@ -160,10 +205,9 @@ export default function AcademyApplicationPage() {
       step: 1,
       rows: [
         ['Email', form.email],
-        ['Phone', form.phone],
+        ['Phone', formatPhone(form.phone, countryCallingCode)],
         ['Address', [form.address, form.city, form.region].filter(Boolean).join(', ')],
-        ['Country of residence', form.country],
-        ['Emergency contact', [form.guardianName, form.guardianRelationship, form.guardianPhone].filter(Boolean).join(' · ')],
+        ['Emergency contact', [form.guardianName, form.guardianRelationship, formatPhone(form.guardianPhone, countryCallingCode)].filter(Boolean).join(' · ')],
       ],
     },
     {
@@ -374,15 +418,20 @@ export default function AcademyApplicationPage() {
                       </label>
                       <label>
                         Phone number <span>*</span>
-                        <input
-                          name="phone"
-                          type="tel"
-                          autoComplete="tel"
-                          value={form.phone}
-                          onChange={updateField}
-                          maxLength={30}
-                          required
-                        />
+                        <span className="academy-phone-field">
+                          <span className="academy-phone-code">{countryCallingCode || '—'}</span>
+                          <input
+                            name="phone"
+                            type="tel"
+                            autoComplete="tel-national"
+                            value={form.phone}
+                            onChange={updateField}
+                            maxLength={30}
+                            inputMode="tel"
+                            placeholder="Local phone number"
+                            required
+                          />
+                        </span>
                       </label>
                     </div>
                     <label>
@@ -409,32 +458,34 @@ export default function AcademyApplicationPage() {
                         />
                       </label>
                       <label>
-                        Region or state <span>*</span>
-                        <input
+                        Region or state {countryRegions.length
+                          ? <span>*</span>
+                          : <span className="academy-optional-label">Optional</span>}
+                        <select
                           name="region"
                           autoComplete="address-level1"
                           value={form.region}
                           onChange={updateField}
-                          maxLength={100}
-                          required
-                        />
+                          required={countryRegions.length > 0}
+                          disabled={!form.nationality || countryRegions.length === 0}
+                        >
+                          <option value="">
+                            {!form.nationality
+                              ? 'Choose a country first'
+                              : countryRegions.length
+                                ? 'Choose a region or state'
+                                : 'No regions listed'}
+                          </option>
+                          {countryRegions.map((region) => (
+                            <option key={region} value={region}>{region}</option>
+                          ))}
+                        </select>
                       </label>
                     </div>
-                    <label>
-                      Country of residence <span>*</span>
-                      <select
-                        name="country"
-                        autoComplete="country-name"
-                        value={form.country}
-                        onChange={updateField}
-                        required
-                      >
-                        <option value="">Choose a country</option>
-                        {COUNTRIES.map((country) => (
-                          <option key={country} value={country}>{country}</option>
-                        ))}
-                      </select>
-                    </label>
+                    <p className="academy-field-hint">
+                      Region and phone country code are based on the country selected in Personal details.
+                      {!countryRegions.length && ' No standard regions are listed for this country.'}
+                    </p>
                     <div className="academy-form-subsection">
                       <div>
                         <h3>Emergency contact <span className="academy-optional-label">Optional</span></h3>
@@ -464,14 +515,19 @@ export default function AcademyApplicationPage() {
                       </div>
                       <label>
                         Emergency contact phone
-                        <input
-                          name="guardianPhone"
-                          type="tel"
-                          autoComplete="tel"
-                          value={form.guardianPhone}
-                          onChange={updateField}
-                          maxLength={30}
-                        />
+                        <span className="academy-phone-field">
+                          <span className="academy-phone-code">{countryCallingCode || '—'}</span>
+                          <input
+                            name="guardianPhone"
+                            type="tel"
+                            autoComplete="tel-national"
+                            value={form.guardianPhone}
+                            onChange={updateField}
+                            maxLength={30}
+                            inputMode="tel"
+                            placeholder="Local phone number"
+                          />
+                        </span>
                       </label>
                     </div>
                   </fieldset>
@@ -654,13 +710,27 @@ export default function AcademyApplicationPage() {
                       </label>
                       <label className="academy-checkbox-label">
                         <input
+                          name="termsAccepted"
+                          type="checkbox"
+                          checked={form.termsAccepted}
+                          onChange={updateField}
+                          required
+                        />
+                        <span>
+                          I have read and agree to the MITA Academy <Link href="/academy/terms" target="_blank" rel="noopener noreferrer">Terms and Conditions</Link>.
+                        </span>
+                      </label>
+                      <label className="academy-checkbox-label">
+                        <input
                           name="privacyConsent"
                           type="checkbox"
                           checked={form.privacyConsent}
                           onChange={updateField}
                           required
                         />
-                        <span>I agree that MITA may use these details to review my application and contact me about admissions.</span>
+                        <span>
+                          I have read the MITA Academy <Link href="/academy/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</Link> and consent to the use of my information to review and process this application.
+                        </span>
                       </label>
                     </div>
                   </fieldset>
@@ -701,7 +771,7 @@ export default function AcademyApplicationPage() {
                   )}
                 </div>
                 <p className="academy-form-privacy">
-                  Your information will be used by MITA to review your application and contact you.
+                  By submitting, you confirm your information is accurate and accept the Academy&apos;s terms and privacy practices.
                 </p>
               </form>
             </>

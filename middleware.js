@@ -124,6 +124,8 @@ export async function middleware(request) {
   if (
     pathname === '/academy/login' ||
     pathname === '/academy/register' ||
+    pathname === '/academy/terms' ||
+    pathname === '/academy/privacy' ||
     pathname === '/academy'
   ) {
     return NextResponse.next();

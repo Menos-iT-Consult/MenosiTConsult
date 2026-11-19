@@ -716,6 +716,38 @@
   outline: 3px solid rgba(0, 161, 252, .18);
   border-color: var(--academy-blue);
 }
+.academy-phone-field {
+  display: flex;
+  min-height: 47px;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+}
+.academy-phone-field:focus-within {
+  outline: 3px solid rgba(0, 161, 252, .18);
+  border-color: var(--academy-blue);
+}
+.academy-phone-code {
+  flex: 0 0 auto;
+  padding: 0 12px;
+  border-right: 1px solid #e2e8f0;
+  color: #53647b;
+  font-size: .9rem;
+  font-weight: 650;
+}
+.academy-application-form .academy-phone-field input {
+  min-width: 0;
+  min-height: 45px;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+}
+.academy-application-form .academy-phone-field input:focus {
+  outline: 0;
+  border-color: transparent;
+}
 .academy-submit-button { width: 100%; margin-top: 3px; }
 .academy-submit-button:disabled { cursor: not-allowed; opacity: .65; }
 .academy-form-privacy { margin: -4px 0 0; color: #8491a3; font-size: .75rem; line-height: 1.5; text-align: center; }
@@ -824,6 +856,19 @@
 .academy-form-navigation .academy-button:disabled { cursor: not-allowed; opacity: .65; }
 .academy-form-navigation .academy-button-secondary { border-color: #cbd5e1; color: #34445b; background: #fff; }
 .academy-form-navigation .academy-button-secondary:hover { background: #f8fafc; box-shadow: none; }
+.academy-policy-layout { padding-top: 48px; padding-bottom: 72px; }
+.academy-policy-card { max-width: 900px; margin: 0 auto; }
+.academy-policy-card h1 { margin: 8px 0; font-size: clamp(2rem, 4vw, 2.8rem); letter-spacing: -.04em; }
+.academy-policy-updated { margin: 0 0 24px; color: var(--academy-muted); font-size: .82rem; }
+.academy-policy-card > p,
+.academy-policy-card section p,
+.academy-policy-card li { color: #46566d; font-size: .94rem; line-height: 1.75; }
+.academy-policy-card section { margin-top: 28px; }
+.academy-policy-card section h2 { margin: 0 0 10px; font-size: 1.15rem; }
+.academy-policy-card section p + p { margin-top: 10px; }
+.academy-policy-card ul { margin: 10px 0 0; padding-left: 22px; }
+.academy-policy-card a { color: var(--academy-blue-dark); font-weight: 650; }
+.academy-policy-footer { margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--academy-line); }
 
 @keyframes academy-rotate {
   to { transform: rotate(360deg); }
