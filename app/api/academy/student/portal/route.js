@@ -18,9 +18,10 @@ export async function GET(request) {
     }
 
     const portal = await academy.getStudentPortalData(student.id);
-    const [program, scholarship] = await Promise.all([
+    const [program, scholarship, programCourses] = await Promise.all([
       student.programId ? academy.getProgram(student.programId) : null,
       academy.getStudentScholarship(student.id),
+      student.programId ? academy.listCourses({ programId: student.programId }) : [],
     ]);
     const feePerSemester = program?.feeStructure?.feePerSemester;
     const semesterFee = feePerSemester == null
@@ -43,6 +44,7 @@ export async function GET(request) {
             ...semesterFee,
             scholarshipName: scholarship?.name || '',
           },
+      programCourses: programCourses.filter((course) => course.published),
       ...portal,
     });
   } catch (err) {

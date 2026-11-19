@@ -23,7 +23,8 @@ export default function CourseDetailsPage() {
   }
 
   const courses = (data.enrollments || []).filter((enrollment) => enrollment.course_id === courseId);
-  if (!courses.length) {
+  const programCourse = (data.programCourses || []).find((item) => item.id === courseId);
+  if (!courses.length && !programCourse) {
     return (
       <main className="ap-main">
         <div className="ap-card ap-empty">
@@ -32,6 +33,27 @@ export default function CourseDetailsPage() {
           <Link className="ap-button" href="/academy/courses">Back to courses</Link>
         </div>
       </main>
+    );
+  }
+
+  if (!courses.length) {
+    return (
+    <main className="ap-main">
+      <Link href="/academy/courses" className="ap-back-link">← All courses</Link>
+      <header className="ap-page-head">
+        <span className="ap-eyebrow">{programCourse.code || 'Course'} · Program course</span>
+        <h1>{programCourse.title}</h1>
+        <p>{programCourse.description || 'This course is assigned to your academic program.'}</p>
+      </header>
+      <div className="ap-course-meta ap-course-meta-large">
+        <span>{programCourse.creditHours} credit hours</span>
+        <span>Semester {programCourse.semesterNumber}</span>
+        {programCourse.instructorName && <span>Instructor: {programCourse.instructorName}</span>}
+      </div>
+      <div className="ap-card ap-empty">
+        <p>This course is part of your program. Class materials, assignments, and results will appear here when you are enrolled in a course session.</p>
+      </div>
+    </main>
     );
   }
 

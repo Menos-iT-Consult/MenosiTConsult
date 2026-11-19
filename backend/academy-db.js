@@ -194,6 +194,29 @@ function mapScholarship(r) {
   };
 }
 
+function mapScholarshipApplication(r) {
+  return {
+    id: r.id,
+    studentId: r.student_id,
+    studentNumber: r.student_number || '',
+    studentName: [r.first_name, r.middle_name, r.last_name].filter(Boolean).join(' '),
+    studentEmail: r.email || '',
+    programName: r.student_program_name || '',
+    scholarshipId: r.scholarship_id,
+    scholarshipName: r.scholarship_name,
+    scholarshipProgramName: r.scholarship_program_name || '',
+    discountType: r.discount_type,
+    discountValue: Number(r.discount_value),
+    statement: r.statement,
+    status: r.status,
+    reviewedBy: r.reviewed_by || '',
+    reviewedAt: iso(r.reviewed_at),
+    reviewNote: r.review_note || '',
+    createdAt: iso(r.created_at),
+    updatedAt: iso(r.updated_at),
+  };
+}
+
 function mapNotification(r) {
   let payload = r.payload;
   if (typeof payload === 'string') { try { payload = JSON.parse(payload); } catch { payload = null; } }
@@ -834,11 +857,18 @@ async function updateScholarship(id, scholarship) {
            JOIN academy_students student ON student.id = award.student_id
           WHERE award.scholarship_id = $1
             AND student.program_id IS DISTINCT FROM $2
+         UNION ALL
+         SELECT 1
+           FROM academy_scholarship_applications application
+           JOIN academy_students student ON student.id = application.student_id
+          WHERE application.scholarship_id = $1
+            AND application.status = 'pending'
+            AND student.program_id IS DISTINCT FROM $2
           LIMIT 1`,
         [id, scholarship.programId]
       );
       if (assignedRows.length) {
-        const error = new Error('The scholarship scope conflicts with students who already have this award.');
+        const error = new Error('The scholarship scope conflicts with students who have an award or a pending application.');
         error.code = 'SCHOLARSHIP_SCOPE_CONFLICT';
         throw error;
       }
@@ -880,21 +910,212 @@ async function getStudentScholarship(studentId) {
   };
 }
 
-async function assignStudentScholarship(studentId, scholarshipId, assignedBy) {
-  if (!scholarshipId) {
-    await q('DELETE FROM academy_student_scholarships WHERE student_id = $1', [studentId]);
-    return null;
-  }
-  await q(
-    `INSERT INTO academy_student_scholarships (student_id, scholarship_id, assigned_by)
-     VALUES ($1,$2,$3)
-     ON CONFLICT (student_id) DO UPDATE
-       SET scholarship_id = EXCLUDED.scholarship_id,
-           assigned_by = EXCLUDED.assigned_by,
-           assigned_at = now()`,
-    [studentId, scholarshipId, assignedBy]
+const scholarshipApplicationSelect = `SELECT application.*,
+       student.student_id AS student_number,
+       student.first_name,
+       student.middle_name,
+       student.last_name,
+       student.email,
+       student_program.name AS student_program_name,
+       scholarship.name AS scholarship_name,
+       scholarship.discount_type,
+       scholarship.discount_value,
+       scholarship_program.name AS scholarship_program_name
+  FROM academy_scholarship_applications application
+  JOIN academy_students student ON student.id = application.student_id
+  JOIN academy_scholarships scholarship ON scholarship.id = application.scholarship_id
+  LEFT JOIN academy_programs student_program ON student_program.id = student.program_id
+  LEFT JOIN academy_programs scholarship_program ON scholarship_program.id = scholarship.program_id`;
+
+async function getStudentScholarshipApplication(studentId) {
+  const { rows } = await q(
+    `${scholarshipApplicationSelect}
+      WHERE application.student_id = $1
+      ORDER BY application.created_at DESC
+      LIMIT 1`,
+    [studentId]
   );
-  return getStudentScholarship(studentId);
+  return rows[0] ? mapScholarshipApplication(rows[0]) : null;
+}
+
+async function listScholarshipApplications({ status = 'pending' } = {}) {
+  const { rows } = await q(
+    `${scholarshipApplicationSelect}
+      WHERE application.status = $1
+      ORDER BY application.created_at ASC`,
+    [status]
+  );
+  return rows.map(mapScholarshipApplication);
+}
+
+async function createScholarshipApplication(studentId, scholarshipId, statement) {
+  return transaction(async (client) => {
+    const { rows: studentRows } = await client.query(
+      'SELECT id, program_id, status FROM academy_students WHERE id = $1 FOR UPDATE',
+      [studentId]
+    );
+    const student = studentRows[0];
+    if (!student || student.status !== 'active') {
+      const error = new Error('An active student account is required to apply.');
+      error.code = 'STUDENT_NOT_ACTIVE';
+      throw error;
+    }
+
+    const { rows: awardRows } = await client.query(
+      'SELECT 1 FROM academy_student_scholarships WHERE student_id = $1',
+      [studentId]
+    );
+    if (awardRows.length) {
+      const error = new Error('A scholarship is already assigned to this student.');
+      error.code = 'STUDENT_ALREADY_AWARDED';
+      throw error;
+    }
+
+    const { rows: scholarshipRows } = await client.query(
+      'SELECT id, program_id, active FROM academy_scholarships WHERE id = $1 FOR SHARE',
+      [scholarshipId]
+    );
+    const scholarship = scholarshipRows[0];
+    if (!scholarship || !scholarship.active) {
+      const error = new Error('This scholarship is not available for applications.');
+      error.code = 'SCHOLARSHIP_NOT_AVAILABLE';
+      throw error;
+    }
+    if (scholarship.program_id && scholarship.program_id !== student.program_id) {
+      const error = new Error('This scholarship is not available for your program.');
+      error.code = 'SCHOLARSHIP_NOT_ELIGIBLE';
+      throw error;
+    }
+
+    const { rows: pendingRows } = await client.query(
+      `SELECT 1 FROM academy_scholarship_applications
+        WHERE student_id = $1 AND status = 'pending'
+        LIMIT 1`,
+      [studentId]
+    );
+    if (pendingRows.length) {
+      const error = new Error('A scholarship application is already under review.');
+      error.code = 'SCHOLARSHIP_APPLICATION_PENDING';
+      throw error;
+    }
+
+    const id = newId('asapp');
+    await client.query(
+      `INSERT INTO academy_scholarship_applications
+        (id, student_id, scholarship_id, statement)
+       VALUES ($1, $2, $3, $4)`,
+      [id, studentId, scholarshipId, statement]
+    );
+    const { rows } = await client.query(
+      `${scholarshipApplicationSelect} WHERE application.id = $1`,
+      [id]
+    );
+    return mapScholarshipApplication(rows[0]);
+  });
+}
+
+async function reviewScholarshipApplication(id, status, reviewerId, reviewNote = '') {
+  return transaction(async (client) => {
+    const { rows: applicationRows } = await client.query(
+      `SELECT id, student_id, scholarship_id, status
+         FROM academy_scholarship_applications
+        WHERE id = $1
+        FOR UPDATE`,
+      [id]
+    );
+    const application = applicationRows[0];
+    if (!application) return null;
+    if (application.status !== 'pending') {
+      const error = new Error('This scholarship application has already been reviewed.');
+      error.code = 'SCHOLARSHIP_APPLICATION_ALREADY_REVIEWED';
+      throw error;
+    }
+
+    const { rows: studentRows } = await client.query(
+      'SELECT id, program_id, status FROM academy_students WHERE id = $1 FOR UPDATE',
+      [application.student_id]
+    );
+    const student = studentRows[0];
+
+    if (status === 'approved') {
+      if (!student || student.status !== 'active') {
+        const error = new Error('The student account is not active and cannot receive a scholarship award.');
+        error.code = 'STUDENT_NOT_ACTIVE';
+        throw error;
+      }
+      const { rows: scholarshipRows } = await client.query(
+        'SELECT id, program_id, active FROM academy_scholarships WHERE id = $1 FOR SHARE',
+        [application.scholarship_id]
+      );
+      const scholarship = scholarshipRows[0];
+      if (!scholarship || !scholarship.active ||
+          (scholarship.program_id && scholarship.program_id !== student.program_id)) {
+        const error = new Error('This scholarship is no longer available for the student.');
+        error.code = 'SCHOLARSHIP_NOT_AVAILABLE';
+        throw error;
+      }
+
+      const { rows: awardRows } = await client.query(
+        'SELECT 1 FROM academy_student_scholarships WHERE student_id = $1',
+        [application.student_id]
+      );
+      if (awardRows.length) {
+        const error = new Error('A scholarship has already been assigned to this student.');
+        error.code = 'STUDENT_ALREADY_AWARDED';
+        throw error;
+      }
+      await client.query(
+        `INSERT INTO academy_student_scholarships (student_id, scholarship_id, assigned_by)
+         VALUES ($1, $2, $3)`,
+        [application.student_id, application.scholarship_id, reviewerId]
+      );
+    }
+
+    await client.query(
+      `UPDATE academy_scholarship_applications
+          SET status = $2, reviewed_by = $3, reviewed_at = now(),
+              review_note = $4, updated_at = now()
+        WHERE id = $1`,
+      [id, status, reviewerId, reviewNote]
+    );
+    const { rows } = await client.query(
+      `${scholarshipApplicationSelect} WHERE application.id = $1`,
+      [id]
+    );
+    return mapScholarshipApplication(rows[0]);
+  });
+}
+
+async function assignStudentScholarship(studentId, scholarshipId, assignedBy) {
+  return transaction(async (client) => {
+    await client.query('SELECT id FROM academy_students WHERE id = $1 FOR UPDATE', [studentId]);
+    if (!scholarshipId) {
+      await client.query('DELETE FROM academy_student_scholarships WHERE student_id = $1', [studentId]);
+      return null;
+    }
+    await client.query(
+      `INSERT INTO academy_student_scholarships (student_id, scholarship_id, assigned_by)
+       VALUES ($1,$2,$3)
+       ON CONFLICT (student_id) DO UPDATE
+         SET scholarship_id = EXCLUDED.scholarship_id,
+             assigned_by = EXCLUDED.assigned_by,
+             assigned_at = now()`,
+      [studentId, scholarshipId, assignedBy]
+    );
+    const { rows } = await client.query(
+      `SELECT scholarship.*, program.name AS program_name, award.assigned_by, award.assigned_at
+         FROM academy_student_scholarships award
+         JOIN academy_scholarships scholarship ON scholarship.id = award.scholarship_id
+         LEFT JOIN academy_programs program ON program.id = scholarship.program_id
+        WHERE award.student_id = $1`,
+      [studentId]
+    );
+    return {
+      ...mapScholarship(rows[0]),
+      assignedBy: rows[0].assigned_by,
+      assignedAt: iso(rows[0].assigned_at),
+    };
+  });
 }
 
 async function deleteProgram(id) {
@@ -921,13 +1142,18 @@ async function createCourse(course) {
   return mapCourse(rows[0]);
 }
 
-async function listCourses({ instructorStaffId } = {}) {
+async function listCourses({ instructorStaffId, programId } = {}) {
   const params = [];
-  let where = '';
+  const conditions = [];
   if (instructorStaffId) {
     params.push(instructorStaffId);
-    where = 'WHERE c.instructor_staff_id = $1';
+    conditions.push(`c.instructor_staff_id = $${params.length}`);
   }
+  if (programId) {
+    params.push(programId);
+    conditions.push(`c.program_id = $${params.length}`);
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   const { rows } = await q(
     `SELECT c.*, s.name AS instructor_name
        FROM academy_courses c
@@ -2329,7 +2555,8 @@ module.exports = {
   // programs and scholarships
   listPrograms, getProgram, createProgram, updateProgram, deleteProgram,
   listScholarships, getScholarship, createScholarship, updateScholarship, setScholarshipActive,
-  getStudentScholarship, assignStudentScholarship,
+  getStudentScholarship, getStudentScholarshipApplication, listScholarshipApplications,
+  createScholarshipApplication, reviewScholarshipApplication, assignStudentScholarship,
   // courses
   createCourse, listCourses, getCourse, setInstructorCourses, isCourseAssignedToInstructor,
   listInstructorRoster,

@@ -4,6 +4,7 @@ const {
   normalizeAmount,
   validateDiscount,
   normalizeScholarshipInput,
+  normalizeScholarshipApplicationInput,
   normalizeProgramInput,
   calculateSemesterFee,
 } = require('../lib/academy-finance');
@@ -59,6 +60,20 @@ test('normalizes editable scholarship details and rejects invalid values', () =>
     programId: 123,
     discountType: 'fixed',
     discountValue: '100',
+  }), null);
+});
+
+test('validates scholarship application selection and statement length', () => {
+  assert.deepEqual(normalizeScholarshipApplicationInput({
+    scholarshipId: ' scholarship-1 ',
+    statement: '  I am applying because this support will help me continue my studies.  ',
+  }), {
+    scholarshipId: 'scholarship-1',
+    statement: 'I am applying because this support will help me continue my studies.',
+  });
+  assert.equal(normalizeScholarshipApplicationInput({
+    scholarshipId: 'scholarship-1',
+    statement: 'Too short',
   }), null);
 });
 

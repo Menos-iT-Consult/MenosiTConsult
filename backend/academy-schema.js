@@ -82,6 +82,22 @@ async function ensureAcademySchema(query) {
     assigned_by text NOT NULL,
     assigned_at timestamptz NOT NULL DEFAULT now()
   );`);
+  await query(`CREATE TABLE IF NOT EXISTS academy_scholarship_applications (
+    id text PRIMARY KEY,
+    student_id text NOT NULL REFERENCES academy_students(id) ON DELETE CASCADE,
+    scholarship_id text NOT NULL REFERENCES academy_scholarships(id) ON DELETE RESTRICT,
+    statement text NOT NULL,
+    status text NOT NULL DEFAULT 'pending'
+      CHECK (status IN ('pending', 'approved', 'rejected')),
+    reviewed_by text,
+    reviewed_at timestamptz,
+    review_note text NOT NULL DEFAULT '',
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+  );`);
+  await query(`CREATE UNIQUE INDEX IF NOT EXISTS academy_scholarship_one_pending_application
+    ON academy_scholarship_applications (student_id)
+    WHERE status = 'pending';`);
   await query(`CREATE TABLE IF NOT EXISTS academy_enrollments (
     id text PRIMARY KEY,
     student_id text, course_id text, session_id text,

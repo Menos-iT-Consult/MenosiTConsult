@@ -15,6 +15,7 @@ const PORTALS = {
       { href: '/academy/courses', label: 'Courses', icon: 'courses' },
       { href: '/academy/assignments', label: 'Assignments', icon: 'assignments' },
       { href: '/academy/fees', label: 'Fees', icon: 'fees' },
+      { href: '/academy/scholarships', label: 'Scholarships', icon: 'scholarships' },
       { href: '/academy/reports', label: 'Grades & exams', icon: 'reports' },
       { href: '/academy/attendance', label: 'Attendance', icon: 'attendance' },
       { href: '/academy/timetable', label: 'Timetable', icon: 'timetable' },
@@ -82,6 +83,12 @@ function NavigationIcon({ name }) {
       <>
         <rect x="3" y="5" width="18" height="14" rx="2" />
         <path d="M3 9h18M7 14h4M16 13v3M14.5 14.5h3" />
+      </>
+    ),
+    scholarships: (
+      <>
+        <path d="m12 3 2.4 4.7 5.2.8-3.8 3.7.9 5.2-4.7-2.5-4.7 2.5.9-5.2-3.8-3.7 5.2-.8z" />
+        <path d="m8 17-.8 4 4.8-2 4.8 2-.8-4" />
       </>
     ),
     reports: (

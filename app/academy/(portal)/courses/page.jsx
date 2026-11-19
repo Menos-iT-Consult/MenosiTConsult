@@ -17,6 +17,9 @@ export default function CoursesPage() {
   }
 
   const enrollments = data.enrollments || [];
+  const programCourses = (data.programCourses || []).filter(
+    (course) => !enrollments.some((enrollment) => enrollment.course_id === course.id)
+  );
   return (
     <main className="ap-main">
       <header className="ap-page-head">
@@ -64,12 +67,47 @@ export default function CoursesPage() {
             );
           })}
         </div>
-      ) : (
+      ) : !programCourses.length ? (
         <div className="ap-card ap-empty">
           <div className="ap-empty-icon" aria-hidden="true">📚</div>
           <h2>No courses yet</h2>
-          <p>When the academy enrolls you in courses, they’ll appear here.</p>
+          <p>Courses assigned to your program will appear here.</p>
         </div>
+      ) : null}
+
+      {programCourses.length > 0 && (
+        <section className="ap-section">
+          <h2>Courses in your program</h2>
+          <div className="ap-grid-2">
+            {programCourses.map((course) => (
+              <article className="ap-card ap-course-card" key={course.id}>
+                <div className="ap-course-title">
+                  <div>
+                    <span className="ap-eyebrow">{course.code || 'Course'}</span>
+                    <h2>{course.title}</h2>
+                  </div>
+                  <span className="ap-chip ap-chip-neutral">Program course</span>
+                </div>
+                <p className="ap-course-description">
+                  {course.description || 'Course overview and learning materials will appear here.'}
+                </p>
+                <div className="ap-course-meta">
+                  <span>{course.creditHours} credit hours</span>
+                  <span>Semester {course.semesterNumber}</span>
+                </div>
+                {course.instructorName && <p className="ap-muted">Instructor: {course.instructorName}</p>}
+                <div className="ap-course-actions">
+                  <Link
+                    className="ap-button"
+                    href={`/academy/courses/${encodeURIComponent(course.id)}`}
+                  >
+                    View course
+                  </Link>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
       )}
     </main>
   );

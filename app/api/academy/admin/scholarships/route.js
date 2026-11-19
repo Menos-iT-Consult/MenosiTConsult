@@ -75,7 +75,7 @@ export async function PATCH(request) {
     if (noDb) return noDb;
     if (error.code === 'SCHOLARSHIP_SCOPE_CONFLICT') {
       return NextResponse.json(
-        { error: 'This program scope excludes students already assigned this scholarship. Change it to All programs or update those student awards first.' },
+        { error: 'This program scope excludes students who have an award or pending application. Change it to All programs or resolve those records first.' },
         { status: 409 }
       );
     }

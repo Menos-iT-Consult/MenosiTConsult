@@ -164,6 +164,7 @@ export default function AcademyProgramsAdminPage() {
   const [programs, setPrograms] = useState([]);
   const [courses, setCourses] = useState([]);
   const [scholarships, setScholarships] = useState([]);
+  const [applications, setApplications] = useState([]);
   const [programForm, setProgramForm] = useState(EMPTY_PROGRAM);
   const [scholarshipForm, setScholarshipForm] = useState(EMPTY_SCHOLARSHIP);
   const [loading, setLoading] = useState(true);
@@ -175,30 +176,36 @@ export default function AcademyProgramsAdminPage() {
     setLoading(true);
     setError('');
     try {
-      const [programResponse, scholarshipResponse, coursesResponse] = await Promise.all([
+      const [programResponse, scholarshipResponse, coursesResponse, applicationsResponse] = await Promise.all([
         fetch('/api/academy/admin/programs', { credentials: 'include' }),
         fetch('/api/academy/admin/scholarships', { credentials: 'include' }),
         fetch('/api/academy/admin/courses', { credentials: 'include' }),
+        fetch('/api/academy/admin/scholarships/applications', { credentials: 'include' }),
       ]);
-      const [programResult, scholarshipResult, coursesResult] = await Promise.all([
+      const [programResult, scholarshipResult, coursesResult, applicationsResult] = await Promise.all([
         programResponse.json(),
         scholarshipResponse.json(),
         coursesResponse.json(),
+        applicationsResponse.json(),
       ]);
-      if (programResponse.status === 401 || scholarshipResponse.status === 401 || coursesResponse.status === 401) {
+      if (programResponse.status === 401 || scholarshipResponse.status === 401 ||
+          coursesResponse.status === 401 || applicationsResponse.status === 401) {
         router.replace('/academy/admin/login');
         return;
       }
-      if (programResponse.status === 403 || scholarshipResponse.status === 403 || coursesResponse.status === 403) {
+      if (programResponse.status === 403 || scholarshipResponse.status === 403 ||
+          coursesResponse.status === 403 || applicationsResponse.status === 403) {
         router.replace('/academy/admin/login');
         return;
       }
       if (!programResponse.ok) throw new Error(programResult.error || 'Could not load programs.');
       if (!scholarshipResponse.ok) throw new Error(scholarshipResult.error || 'Could not load scholarship programs.');
       if (!coursesResponse.ok) throw new Error(coursesResult.error || 'Could not load courses and instructors.');
+      if (!applicationsResponse.ok) throw new Error(applicationsResult.error || 'Could not load scholarship applications.');
       setPrograms(programResult.programs || []);
       setScholarships(scholarshipResult.scholarships || []);
       setCourses(coursesResult.courses || []);
+      setApplications(applicationsResult.applications || []);
     } catch (loadError) {
       setError(loadError.message || 'Could not load Academy programs.');
     } finally {
@@ -330,6 +337,35 @@ export default function AcademyProgramsAdminPage() {
     setNotice('Scholarship details updated.');
     await load();
     return result.scholarship;
+  }
+
+  async function reviewApplication(application, status) {
+    const savingId = `application:${application.id}`;
+    setSaving(savingId);
+    setError('');
+    setNotice('');
+    try {
+      const response = await fetch('/api/academy/admin/scholarships/applications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ applicationId: application.id, status }),
+      });
+      const result = await response.json();
+      if (response.status === 401 || response.status === 403) {
+        router.replace('/academy/admin/login');
+        return;
+      }
+      if (!response.ok) throw new Error(result.error || 'Could not review this application.');
+      setNotice(status === 'approved'
+        ? `Scholarship application approved for ${application.studentName}.`
+        : `Scholarship application declined for ${application.studentName}.`);
+      await load();
+    } catch (reviewError) {
+      setError(reviewError.message || 'Could not review this application.');
+    } finally {
+      setSaving('');
+    }
   }
 
   return (
@@ -493,6 +529,57 @@ export default function AcademyProgramsAdminPage() {
             ))}
           </div>
         ) : !loading && !error ? <div className="ap-card ap-empty"><p>No scholarship programs have been created.</p></div> : null}
+      </section>
+
+      <section className="ap-section">
+        <div className="ap-card-heading">
+          <h2>Scholarship applications</h2>
+          <span className="ap-muted">{applications.length} awaiting review</span>
+        </div>
+        {loading ? <p>Loading scholarship applications…</p> : applications.length ? (
+          <div className="ap-stack">
+            {applications.map((application) => (
+              <article className="ap-card" key={application.id}>
+                <div className="ap-card-heading">
+                  <div>
+                    <h3>{application.studentName || 'Student application'}</h3>
+                    <p className="ap-muted">
+                      {application.studentNumber || 'No Student ID'} · {application.programName || 'Program unavailable'}
+                    </p>
+                  </div>
+                  <span className="ap-chip ap-chip-pending">Pending</span>
+                </div>
+                <p>
+                  <strong>{application.scholarshipName}</strong> · {application.discountType === 'percentage'
+                    ? `${application.discountValue}% discount`
+                    : `GHS ${Number(application.discountValue).toFixed(2)} per semester`}
+                </p>
+                <p className="ap-student-statement">{application.statement}</p>
+                <p className="ap-muted">
+                  {application.studentEmail} · Applied {new Date(application.createdAt).toLocaleDateString()}
+                </p>
+                <div className="ap-form-grid">
+                  <button
+                    className="ap-button ap-button-primary"
+                    type="button"
+                    onClick={() => reviewApplication(application, 'approved')}
+                    disabled={saving === `application:${application.id}`}
+                  >
+                    {saving === `application:${application.id}` ? 'Saving…' : 'Approve & award'}
+                  </button>
+                  <button
+                    className="ap-button ap-button-danger"
+                    type="button"
+                    onClick={() => reviewApplication(application, 'rejected')}
+                    disabled={saving === `application:${application.id}`}
+                  >
+                    Decline
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : !error ? <div className="ap-card ap-empty"><p>No scholarship applications are awaiting review.</p></div> : null}
       </section>
     </main>
   );
