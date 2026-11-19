@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAcademyDatabaseConfigError } from './lib/academy-db-config';
+const { verifySignedCookie } = require('./lib/signed-cookie-verification');
 
 /**
  * Auth gate for /admin.
@@ -9,76 +10,16 @@ import { getAcademyDatabaseConfigError } from './lib/academy-db-config';
  *   raw value   = `s:<val>.<base64url-standard HMAC-SHA256 of <val>>`
  *   (cookie-signature strips trailing '=' padding from the base64 digest)
  *   cookie sent = encodeURIComponent(raw value)  → 's%3Atrue.XXXX'
+ * Academy cookies use cookie-signature directly and omit the `s:` prefix.
  *
- * We mirror cookie-parser's verification with edge-safe Web Crypto: recompute
- * the HMAC over the payload, base64-encode it (standard alphabet, +,/,=),
- * strip padding on both sides and compare. Invalid signature or missing
- * cookie → redirect to /admin/login (except for /admin/login itself).
+ * We verify both formats with edge-safe Web Crypto. Invalid signatures or a
+ * missing cookie redirect to the relevant login page.
  *
  * NOTE: Next.js only loads middleware from the project root (or src/) —
  * `app/middleware.ts` is NOT picked up, hence this file's location.
  */
 
 const COOKIE_NAME = 'admin_auth';
-
-function toBase64(buffer) {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}
-
-function stripPadding(value) {
-  return value.replace(/=+$/, '');
-}
-
-function timingSafeEqual(a, b) {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return diff === 0;
-}
-
-async function verifySignedCookie(raw, secret) {
-  let value = raw;
-  try {
-    value = decodeURIComponent(raw);
-  } catch {
-    /* keep raw — already decoded or not percent-encoded */
-  }
-
-  if (!secret) {
-    // cookie-parser only signs when a secret exists; without one the backend
-    // sets the plain value. Fall back to a presence check (the API still
-    // enforces its own auth, so this cannot grant data access).
-    return value === 'true';
-  }
-
-  const prefix = 's:';
-  if (!value.startsWith(prefix)) return false;
-  const rest = value.slice(prefix.length);
-  const dot = rest.lastIndexOf('.');
-  if (dot <= 0) return false;
-  const payload = rest.slice(0, dot);
-  const signature = stripPadding(rest.slice(dot + 1));
-  if (!payload || !signature) return false;
-
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  const mac = await crypto.subtle.sign('HMAC', key, encoder.encode(payload));
-  const expected = stripPadding(toBase64(mac));
-  return timingSafeEqual(expected, signature);
-}
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
