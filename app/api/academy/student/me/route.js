@@ -32,6 +32,7 @@ export async function GET(request) {
     id: student.id,
     studentId: student.studentId,
     firstName: student.firstName,
+    middleName: student.middleName,
     lastName: student.lastName,
     email: student.email,
     phone: student.phone,

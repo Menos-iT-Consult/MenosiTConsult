@@ -192,6 +192,17 @@ async function ensureAcademySchema(query) {
     key text PRIMARY KEY,
     value jsonb
   );`);
+  await query(`CREATE TABLE IF NOT EXISTS academy_student_certificates (
+    student_id text PRIMARY KEY,
+    certificate_number text NOT NULL UNIQUE,
+    student_name text NOT NULL,
+    program_name text NOT NULL,
+    issue_date date NOT NULL,
+    issued_at timestamptz NOT NULL DEFAULT now(),
+    issued_by text NOT NULL,
+    template_key text NOT NULL,
+    document_key text NOT NULL
+  );`);
 }
 
 module.exports = ensureAcademySchema;

@@ -217,6 +217,8 @@ async function listAdminStudents({
     `SELECT st.id, st.student_id, st.first_name, st.middle_name, st.last_name,
             st.email, st.phone, st.program_id, st.status, st.admitted_at, st.created_at,
             p.name AS program_name,
+            cert.certificate_number,
+            cert.issued_at AS certificate_issued_at,
             COALESCE(latest.status, 'not_sent') AS sms_status,
             latest.error AS sms_error,
             latest.created_at AS sms_at,
@@ -224,6 +226,7 @@ async function listAdminStudents({
             COUNT(*) OVER() AS total_count
        FROM academy_students st
        LEFT JOIN academy_programs p ON p.id = st.program_id
+       LEFT JOIN academy_student_certificates cert ON cert.student_id = st.id
        LEFT JOIN LATERAL (
          SELECT n.status, n.error, n.created_at
            FROM academy_notifications n
@@ -275,6 +278,8 @@ async function listAdminStudents({
       status: row.status,
       admittedAt: iso(row.admitted_at),
       createdAt: iso(row.created_at),
+      certificateNumber: row.certificate_number || '',
+      certificateIssuedAt: iso(row.certificate_issued_at),
       sessionNames: row.session_names || [],
       smsStatus: row.sms_status || 'not_sent',
       smsError: row.sms_error || '',
@@ -287,6 +292,64 @@ async function listAdminStudents({
 async function getStudent(id) {
   const { rows } = await q('SELECT * FROM academy_students WHERE id = $1', [id]);
   return rows[0] ? mapStudent(rows[0]) : null;
+}
+
+async function getStudentCertificate(studentId) {
+  const { rows } = await q(
+    `SELECT student_id, certificate_number, student_name, program_name, issue_date,
+            issued_at, issued_by, template_key, document_key
+       FROM academy_student_certificates
+      WHERE student_id = $1`,
+    [studentId]
+  );
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    studentId: row.student_id,
+    certificateNumber: row.certificate_number,
+    studentName: row.student_name,
+    programName: row.program_name,
+    issueDate: dateOnly(row.issue_date),
+    issuedAt: iso(row.issued_at),
+    issuedBy: row.issued_by,
+    templateKey: row.template_key,
+    documentKey: row.document_key,
+  };
+}
+
+async function createStudentCertificate(certificate) {
+  const { rows } = await q(
+    `INSERT INTO academy_student_certificates
+      (student_id, certificate_number, student_name, program_name, issue_date,
+       issued_by, template_key, document_key)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+     ON CONFLICT (student_id) DO NOTHING
+     RETURNING student_id, certificate_number, student_name, program_name, issue_date,
+               issued_at, issued_by, template_key, document_key`,
+    [
+      certificate.studentId,
+      certificate.certificateNumber,
+      certificate.studentName,
+      certificate.programName,
+      certificate.issueDate,
+      certificate.issuedBy,
+      certificate.templateKey,
+      certificate.documentKey,
+    ]
+  );
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    studentId: row.student_id,
+    certificateNumber: row.certificate_number,
+    studentName: row.student_name,
+    programName: row.program_name,
+    issueDate: dateOnly(row.issue_date),
+    issuedAt: iso(row.issued_at),
+    issuedBy: row.issued_by,
+    templateKey: row.template_key,
+    documentKey: row.document_key,
+  };
 }
 
 async function getStudentByStudentId(studentId) {
@@ -2173,6 +2236,7 @@ module.exports = {
   listInvoices, getInvoice, createInvoice, updateInvoice, deleteInvoice,
   // notifications
   logNotification, listNotifications, listFailedAdmissionSms, listAnnouncements, createAnnouncement,
-  // settings
+  // certificates and settings
+  getStudentCertificate, createStudentCertificate,
   getAcademySetting, setAcademySetting,
 };

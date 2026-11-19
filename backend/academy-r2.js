@@ -7,6 +7,7 @@
 const crypto = require('crypto');
 
 let client = null;
+let certificateClient = null;
 
 function env(name) {
   const value = process.env[name];
@@ -17,6 +18,10 @@ function bucket() {
   return env('ACADEMY_R2_BUCKET');
 }
 
+function certificateBucket() {
+  return env('ACADEMY_CERTIFICATE_R2_BUCKET');
+}
+
 function academyR2Enabled() {
   const academyBucket = bucket();
   const mainBucket = env('R2_BUCKET');
@@ -25,6 +30,17 @@ function academyR2Enabled() {
     env('R2_SECRET_ACCESS_KEY') &&
     academyBucket &&
     (!mainBucket || academyBucket.toLowerCase() !== mainBucket.toLowerCase())
+  );
+}
+
+function academyCertificateStorageEnabled() {
+  const certificateBucketName = certificateBucket();
+  const publicBuckets = [env('ACADEMY_R2_BUCKET'), env('R2_BUCKET')].filter(Boolean);
+  return !!(
+    env('R2_ACCESS_KEY_ID') &&
+    env('R2_SECRET_ACCESS_KEY') &&
+    certificateBucketName &&
+    !publicBuckets.some((name) => name.toLowerCase() === certificateBucketName.toLowerCase())
   );
 }
 
@@ -61,6 +77,87 @@ function getClient() {
     });
   }
   return client;
+}
+
+function getCertificateClient() {
+  const bucketName = certificateBucket();
+  if (!env('R2_ACCESS_KEY_ID') || !env('R2_SECRET_ACCESS_KEY') || !bucketName) {
+    const error = new Error(
+      'Private Academy certificate storage is not configured. Set R2 credentials and ACADEMY_CERTIFICATE_R2_BUCKET.'
+    );
+    error.noR2 = true;
+    throw error;
+  }
+  const publicBuckets = [env('ACADEMY_R2_BUCKET'), env('R2_BUCKET')].filter(Boolean);
+  if (publicBuckets.some((name) => name.toLowerCase() === bucketName.toLowerCase())) {
+    const error = new Error(
+      'ACADEMY_CERTIFICATE_R2_BUCKET must be separate from public Academy and main-site media buckets.'
+    );
+    error.noR2 = true;
+    throw error;
+  }
+  if (!certificateClient) {
+    const { S3Client } = require('@aws-sdk/client-s3');
+    const endpoint = env('R2_ENDPOINT') ||
+      (env('R2_ACCOUNT_ID') ? `https://${env('R2_ACCOUNT_ID')}.r2.cloudflarestorage.com` : '');
+    certificateClient = new S3Client({
+      region: 'auto',
+      endpoint: endpoint || undefined,
+      credentials: {
+        accessKeyId: env('R2_ACCESS_KEY_ID'),
+        secretAccessKey: env('R2_SECRET_ACCESS_KEY'),
+      },
+    });
+  }
+  return certificateClient;
+}
+
+function createPrivatePdfKey(category) {
+  if (!['templates', 'issued'].includes(category)) {
+    throw new Error('Unsupported private Academy PDF category.');
+  }
+  return `academy/private/certificates/${category}/${new Date().getFullYear()}/${crypto.randomBytes(20).toString('hex')}.pdf`;
+}
+
+async function putPrivatePdf(buffer, category) {
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+    throw new Error('A non-empty PDF buffer is required.');
+  }
+  const { PutObjectCommand } = require('@aws-sdk/client-s3');
+  const key = createPrivatePdfKey(category);
+  await getCertificateClient().send(new PutObjectCommand({
+    Bucket: certificateBucket(),
+    Key: key,
+    Body: buffer,
+    ContentType: 'application/pdf',
+    CacheControl: 'private, no-store',
+  }));
+  return { key, size: buffer.length };
+}
+
+async function getPrivatePdfBytes(key) {
+  if (typeof key !== 'string' ||
+      !/^academy\/private\/certificates\/(templates|issued)\/\d{4}\/[a-f0-9]{40}\.pdf$/.test(key)) {
+    throw new Error('Invalid private Academy PDF key.');
+  }
+  const { GetObjectCommand } = require('@aws-sdk/client-s3');
+  const result = await getCertificateClient().send(new GetObjectCommand({
+    Bucket: certificateBucket(),
+    Key: key,
+  }));
+  return Buffer.from(await result.transformToByteArray());
+}
+
+async function deletePrivatePdf(key) {
+  if (typeof key !== 'string' ||
+      !/^academy\/private\/certificates\/(templates|issued)\/\d{4}\/[a-f0-9]{40}\.pdf$/.test(key)) {
+    throw new Error('Invalid private Academy PDF key.');
+  }
+  const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
+  await getCertificateClient().send(new DeleteObjectCommand({
+    Bucket: certificateBucket(),
+    Key: key,
+  }));
 }
 
 const EXT = {
@@ -127,8 +224,12 @@ async function presignPut(mime) {
 
 module.exports = {
   r2Enabled: academyR2Enabled,
+  certificateStorageEnabled: academyCertificateStorageEnabled,
   publicBase,
   putImage,
   getImageBytes,
   presignPut,
+  putPrivatePdf,
+  getPrivatePdfBytes,
+  deletePrivatePdf,
 };

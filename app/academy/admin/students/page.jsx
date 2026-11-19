@@ -34,6 +34,8 @@ export default function AcademyStudentsAdminPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [issuingId, setIssuingId] = useState('');
+  const [certificateMessage, setCertificateMessage] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -77,6 +79,34 @@ export default function AcademyStudentsAdminPage() {
     setPage(0);
   }
 
+  async function issueCertificate(student) {
+    const name = [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ');
+    if (!window.confirm(`Issue a certificate for ${name || 'this student'}? This cannot be undone.`)) return;
+    setIssuingId(student.id);
+    setCertificateMessage('');
+    setError('');
+    try {
+      const response = await fetch(`/api/academy/admin/students/${encodeURIComponent(student.id)}/certificate`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const result = await response.json();
+      if (response.status === 401 || response.status === 403) {
+        router.replace('/academy/admin/login');
+        return;
+      }
+      if (!response.ok) throw new Error(result.error || 'Could not issue the certificate.');
+      setStudents((current) => current.map((item) => item.id === student.id
+        ? { ...item, certificateNumber: result.certificate.certificateNumber, certificateIssuedAt: result.certificate.issuedAt }
+        : item));
+      setCertificateMessage(`Certificate ${result.certificate.certificateNumber} issued to ${name}.`);
+    } catch (issueError) {
+      setError(issueError.message || 'Could not issue the certificate.');
+    } finally {
+      setIssuingId('');
+    }
+  }
+
   return (
       <main className="ap-main">
         <header className="ap-page-head ap-admin-heading">
@@ -87,6 +117,7 @@ export default function AcademyStudentsAdminPage() {
         </header>
 
         {error && <div className="ap-error" role="alert">{error}</div>}
+        {certificateMessage && <div className="ap-notice" role="status">{certificateMessage}</div>}
 
         <section className="ap-card ap-section">
           <form onSubmit={applyFilters} className="ap-form-grid">
@@ -183,6 +214,20 @@ export default function AcademyStudentsAdminPage() {
                     <div className="ap-def"><dt>Admission SMS</dt><dd>{smsLabel(student.smsStatus)}</dd></div>
                   </dl>
                   {student.smsError && <p className="ap-muted">{student.smsError}</p>}
+                  {student.certificateNumber ? (
+                    <p className="ap-muted">
+                      Certificate issued: <strong>{student.certificateNumber}</strong>
+                    </p>
+                  ) : (
+                    <button
+                      className="ap-button ap-certificate-action"
+                      type="button"
+                      onClick={() => issueCertificate(student)}
+                      disabled={issuingId === student.id || student.status !== 'active' || !student.studentId || !student.programId}
+                    >
+                      {issuingId === student.id ? 'Issuing…' : 'Issue certificate'}
+                    </button>
+                  )}
                 </article>
               ))}
             </div>

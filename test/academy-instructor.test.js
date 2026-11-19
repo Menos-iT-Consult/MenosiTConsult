@@ -124,6 +124,7 @@ test('Academy R2 requires its own bucket and rejects the main-site bucket', asyn
     'R2_BUCKET',
     'ACADEMY_R2_BUCKET',
     'ACADEMY_R2_PUBLIC_BASE',
+    'ACADEMY_CERTIFICATE_R2_BUCKET',
   ];
   const originalEnvironment = Object.fromEntries(names.map((name) => [name, process.env[name]]));
 
@@ -132,9 +133,26 @@ test('Academy R2 requires its own bucket and rejects the main-site bucket', asyn
     process.env.R2_SECRET_ACCESS_KEY = 'test-secret';
     process.env.R2_BUCKET = 'main-media';
     process.env.ACADEMY_R2_BUCKET = 'academy-media';
+    process.env.ACADEMY_CERTIFICATE_R2_BUCKET = 'academy-private-certificates';
     process.env.ACADEMY_R2_PUBLIC_BASE = 'https://academy-media.example.test/';
     assert.equal(academyR2.r2Enabled(), true);
+    assert.equal(academyR2.certificateStorageEnabled(), true);
     assert.equal(academyR2.publicBase(), 'https://academy-media.example.test');
+
+    process.env.ACADEMY_CERTIFICATE_R2_BUCKET = 'ACADEMY-MEDIA';
+    assert.equal(academyR2.certificateStorageEnabled(), false);
+    process.env.ACADEMY_CERTIFICATE_R2_BUCKET = 'MAIN-MEDIA';
+    assert.equal(academyR2.certificateStorageEnabled(), false);
+    process.env.ACADEMY_CERTIFICATE_R2_BUCKET = 'academy-private-certificates';
+
+    await assert.rejects(
+      academyR2.getPrivatePdfBytes('../public/certificate.pdf'),
+      /Invalid private Academy PDF key/
+    );
+    await assert.rejects(
+      academyR2.deletePrivatePdf('academy/private/certificates/issued/2026/not-a-pdf.pdf'),
+      /Invalid private Academy PDF key/
+    );
 
     process.env.ACADEMY_R2_BUCKET = 'MAIN-MEDIA';
     assert.equal(academyR2.r2Enabled(), false);

@@ -11,12 +11,20 @@ const PORTALS = {
     logout: '/api/academy/auth/logout',
     login: '/academy/login',
     links: [
-      { href: '/academy/dashboard', label: 'Dashboard', shortLabel: 'D' },
-      { href: '/academy/courses', label: 'Courses', shortLabel: 'C' },
-      { href: '/academy/assignments', label: 'Assignments & exams', shortLabel: 'A' },
-      { href: '/academy/attendance', label: 'Attendance', shortLabel: 'AT' },
-      { href: '/academy/timetable', label: 'Timetable', shortLabel: 'T' },
-      { href: '/academy/profile', label: 'Profile', shortLabel: 'P' },
+      { href: '/academy/dashboard', label: 'Dashboard', icon: 'dashboard' },
+      { href: '/academy/courses', label: 'Courses', icon: 'courses' },
+      { href: '/academy/assignments', label: 'Assignments & exams', icon: 'assignments' },
+      { href: '/academy/attendance', label: 'Attendance', icon: 'attendance' },
+      { href: '/academy/timetable', label: 'Timetable', icon: 'timetable' },
+      {
+        href: '/academy/profile',
+        label: 'Profile',
+        icon: 'profile',
+        children: [
+          { href: '/academy/profile/id-card', label: 'Student ID Card', icon: 'idCard' },
+          { href: '/academy/profile/certificate', label: 'Certificate', icon: 'certificate' },
+        ],
+      },
     ],
   },
   admin: {
@@ -25,10 +33,11 @@ const PORTALS = {
     logout: '/api/academy/staff/auth/logout',
     login: '/academy/admin/login',
     links: [
-      { href: '/academy/admin/admissions', label: 'Admissions', shortLabel: 'AD' },
-      { href: '/academy/admin/students', label: 'Students', shortLabel: 'ST' },
-      { href: '/academy/admin/instructors', label: 'Instructors & courses', shortLabel: 'IC' },
-      { href: '/academy/admin/announcements', label: 'Announcements', shortLabel: 'AN' },
+      { href: '/academy/admin/admissions', label: 'Admissions', icon: 'admissions' },
+      { href: '/academy/admin/students', label: 'Students', icon: 'students' },
+      { href: '/academy/admin/instructors', label: 'Instructors & courses', icon: 'courses' },
+      { href: '/academy/admin/announcements', label: 'Announcements', icon: 'announcements' },
+      { href: '/academy/admin/certificates', label: 'Certificates', icon: 'certificate' },
     ],
   },
   instructor: {
@@ -37,12 +46,107 @@ const PORTALS = {
     logout: '/api/academy/staff/auth/logout',
     login: '/instructor/login',
     links: [
-      { href: '/instructor/dashboard', label: 'Dashboard', shortLabel: 'D' },
-      { href: '/instructor/dashboard#my-courses', label: 'My courses', shortLabel: 'C' },
-      { href: '/instructor/dashboard#upcoming-deadlines', label: 'Deadlines', shortLabel: 'DL' },
+      { href: '/instructor/dashboard', label: 'Dashboard', icon: 'dashboard' },
+      { href: '/instructor/dashboard#my-courses', label: 'My courses', icon: 'courses' },
+      { href: '/instructor/dashboard#upcoming-deadlines', label: 'Deadlines', icon: 'assignments' },
     ],
   },
 };
+
+function NavigationIcon({ name }) {
+  const icons = {
+    dashboard: (
+      <>
+        <rect x="3" y="3" width="7" height="7" rx="1" />
+        <rect x="14" y="3" width="7" height="7" rx="1" />
+        <rect x="3" y="14" width="7" height="7" rx="1" />
+        <rect x="14" y="14" width="7" height="7" rx="1" />
+      </>
+    ),
+    courses: (
+      <>
+        <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21z" />
+        <path d="M4 5.5v13A2.5 2.5 0 0 1 6.5 16H20M8 7h8M8 10h8" />
+      </>
+    ),
+    assignments: (
+      <>
+        <path d="M9 4h6M9 3h6v3H9z" />
+        <path d="M7 5H5v16h14V5h-2M8 11h8M8 15h8" />
+      </>
+    ),
+    attendance: (
+      <>
+        <rect x="3" y="5" width="18" height="16" rx="2" />
+        <path d="M7 3v4M17 3v4M3 10h18M8 15l2 2 5-5" />
+      </>
+    ),
+    timetable: (
+      <>
+        <rect x="3" y="5" width="18" height="16" rx="2" />
+        <path d="M7 3v4M17 3v4M3 10h18M8 14h3M8 17h3M15 14h1" />
+      </>
+    ),
+    profile: (
+      <>
+        <circle cx="12" cy="8" r="4" />
+        <path d="M4 21a8 8 0 0 1 16 0" />
+      </>
+    ),
+    idCard: (
+      <>
+        <rect x="2.5" y="4" width="19" height="16" rx="2" />
+        <circle cx="8" cy="10" r="2" />
+        <path d="M5 16a3 3 0 0 1 6 0M14 9h4M14 13h4M14 17h3" />
+      </>
+    ),
+    certificate: (
+      <>
+        <path d="M12 3 15 5l3.5.5.5 3.5 2 3-2 3-.5 3.5L15 19l-3 2-3-2-3.5-.5L5 15l-2-3 2-3 .5-3.5L9 5z" />
+        <path d="m9 12 2 2 4-4M9 19l-1 3 4-2 4 2-1-3" />
+      </>
+    ),
+    admissions: (
+      <>
+        <path d="M4 4h16v16H4zM8 8h8M8 12h5M8 16h4M16 14l2 2 3-4" />
+      </>
+    ),
+    students: (
+      <>
+        <circle cx="9" cy="8" r="3" />
+        <path d="M3 20a6 6 0 0 1 12 0M16 5a3 3 0 0 1 0 6M18 14a5 5 0 0 1 3 5" />
+      </>
+    ),
+    announcements: (
+      <>
+        <path d="M4 13h3l11 5V6L7 11H4zM7 13l2 7h4l-2-5M21 9v6" />
+      </>
+    ),
+    logout: (
+      <>
+        <path d="M10 17l5-5-5-5M15 12H3M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7" />
+      </>
+    ),
+  };
+
+  return (
+    <svg
+      className="ap-sidebar-svg"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {icons[name] || icons.dashboard}
+    </svg>
+  );
+}
 
 function isStandaloneRoute(portal, pathname) {
   if (portal === 'admin') return pathname === '/academy/admin/login';
@@ -56,7 +160,6 @@ export default function PortalShell({ portal, children }) {
   const config = PORTALS[portal];
   const pathname = usePathname();
   const router = useRouter();
-  const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeHash, setActiveHash] = useState('');
   const [signingOut, setSigningOut] = useState(false);
@@ -128,6 +231,7 @@ export default function PortalShell({ portal, children }) {
   }
 
   function isActive(link) {
+    if (link.children) return pathname === link.href;
     const [hrefPath, hrefHash] = link.href.split('#');
     if (hrefHash) return pathname === hrefPath && activeHash === `#${hrefHash}`;
     return pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);
@@ -139,7 +243,7 @@ export default function PortalShell({ portal, children }) {
   }
 
   return (
-    <div className={`ap ap-shell ap-shell-${portal}${collapsed ? ' is-collapsed' : ''}${mobileOpen ? ' is-mobile-open' : ''}`}>
+    <div className={`ap ap-shell ap-shell-${portal}${mobileOpen ? ' is-mobile-open' : ''}`}>
       <button
         className="ap-sidebar-scrim"
         type="button"
@@ -176,34 +280,46 @@ export default function PortalShell({ portal, children }) {
           >
             <span aria-hidden="true">&times;</span>
           </button>
-          <button
-            className="ap-sidebar-collapse"
-            type="button"
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            aria-expanded={!collapsed}
-            onClick={() => setCollapsed((value) => !value)}
-          >
-            <span className="ap-sidebar-chevron" aria-hidden="true" />
-          </button>
         </div>
 
         <nav className="ap-sidebar-nav">
           <span className="ap-sidebar-section-label">Workspace</span>
           {config.links.map((link) => {
             const active = isActive(link);
-            return (
+            const navLink = (
               <Link
-                key={link.href}
                 href={link.href}
                 className={`ap-sidebar-link${active ? ' is-active' : ''}`}
                 aria-current={active ? 'page' : undefined}
-                aria-label={collapsed ? link.label : undefined}
-                title={collapsed ? link.label : undefined}
                 onClick={closeMobileMenu}
               >
-                <span className="ap-sidebar-icon" aria-hidden="true">{link.shortLabel}</span>
+                <span className="ap-sidebar-icon"><NavigationIcon name={link.icon} /></span>
                 <span className="ap-sidebar-label">{link.label}</span>
               </Link>
+            );
+            return (
+              <div className="ap-sidebar-group" key={link.href}>
+                {navLink}
+                {link.children && (
+                  <div className="ap-sidebar-subnav">
+                    {link.children.map((child) => {
+                      const childActive = pathname === child.href;
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          className={`ap-sidebar-sub-link${childActive ? ' is-active' : ''}`}
+                          aria-current={childActive ? 'page' : undefined}
+                          onClick={closeMobileMenu}
+                        >
+                          <span className="ap-sidebar-icon"><NavigationIcon name={child.icon} /></span>
+                          <span>{child.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
         </nav>
@@ -213,11 +329,11 @@ export default function PortalShell({ portal, children }) {
           <button
             className="ap-sidebar-signout"
             type="button"
-            aria-label={collapsed ? 'Sign out' : undefined}
+            aria-label="Sign out"
             onClick={signOut}
             disabled={signingOut}
           >
-            <span className="ap-sidebar-icon" aria-hidden="true">OUT</span>
+            <span className="ap-sidebar-icon"><NavigationIcon name="logout" /></span>
             <span className="ap-sidebar-label">{signingOut ? 'Signing out…' : 'Sign out'}</span>
           </button>
         </div>
