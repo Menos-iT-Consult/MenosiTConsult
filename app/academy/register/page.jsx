@@ -278,7 +278,7 @@ export default function AcademyApplicationPage() {
       <header className="academy-application-header">
         <div className="academy-container academy-application-header-inner">
           <Link className="academy-brand" href="/academy">
-            <img src="/assets/logo-black.png" alt="" />
+            <img src="/assets/academy-logo-white.png" alt="MITA IT Academy" />
             <span><strong>MITA</strong><small>IT Academy</small></span>
           </Link>
           <Link href="/academy" className="academy-back-link">← Back to academy</Link>

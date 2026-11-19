@@ -43,7 +43,7 @@ export default function AcademyAdminLoginPage() {
     <main className="ap-auth">
       <div className="ap-auth-card">
         <div className="ap-auth-logo">
-          <img src="/assets/logo-black.png" alt="" />
+          <img src="/assets/academy-logo-white.png" alt="MITA IT Academy" />
           <h1>Academy announcements</h1>
           <p>Administrator sign in</p>
         </div>

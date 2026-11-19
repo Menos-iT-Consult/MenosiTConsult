@@ -15,6 +15,7 @@ export default function StudentIdCardPage() {
   const [error, setError] = useState('');
   const [verificationUrl, setVerificationUrl] = useState('');
   const [verificationError, setVerificationError] = useState('');
+  const [photoError, setPhotoError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -24,6 +25,7 @@ export default function StudentIdCardPage() {
       setError('');
       setVerificationUrl('');
       setVerificationError('');
+      setPhotoError(false);
       try {
         const response = await fetch('/api/academy/student/me', {
           credentials: 'include',
@@ -104,19 +106,25 @@ export default function StudentIdCardPage() {
           <path fill="#d4b14e" d="M0 490c151 34 245 54 372 49 164-7 315-76 484-47v48H0v-50Z" />
         </svg>
         <header className="ap-id-card-brand">
-          <span className="ap-id-card-mark" aria-hidden="true">M</span>
-          <div className="ap-id-card-brand-copy">
-            <strong>MENOS I.T. CONSULT</strong>
-            <small>MITA · IT ACADEMY</small>
-          </div>
+          <img className="ap-id-card-logo" src="/assets/academy-logo-white.png" alt="MITA IT Academy" />
           <h2>STUDENT ID CARD</h2>
         </header>
         <div className="ap-id-card-body">
-          {student.photo ? (
-            <img className="ap-id-card-photo" src={student.photo} alt={`${fullName} passport photo`} />
+          {student.photo && !photoError ? (
+            <img
+              className="ap-id-card-photo"
+              src={student.photo}
+              alt={`${fullName} passport photo`}
+              onError={() => setPhotoError(true)}
+            />
           ) : (
-            <div className="ap-id-card-photo ap-id-card-placeholder" aria-hidden="true">
-              {fullName.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()}
+            <div
+              className="ap-id-card-photo ap-id-card-placeholder"
+              role="img"
+              aria-label={photoError ? 'Student passport photo unavailable' : 'No passport photo provided'}
+            >
+              <span>{fullName.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()}</span>
+              <small>{photoError ? 'Photo unavailable' : 'No photo'}</small>
             </div>
           )}
           <div className="ap-id-card-details">

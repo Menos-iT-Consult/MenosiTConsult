@@ -55,21 +55,14 @@
 }
 
 .ap-sidebar-logo {
-  display: grid;
-  width: 38px;
-  height: 38px;
+  display: block;
+  width: 120px;
+  max-width: 100%;
+  height: auto;
   flex: none;
-  place-items: center;
-  border-radius: 12px;
-  background: var(--blue);
-  color: #fff;
-  font-size: 1.05rem;
-  font-weight: 800;
+  object-fit: contain;
 }
 
-.ap-sidebar-brand-copy { display: grid; min-width: 0; gap: 3px; }
-.ap-sidebar-brand-copy strong { overflow: hidden; font-size: .9rem; text-overflow: ellipsis; white-space: nowrap; }
-.ap-sidebar-brand-copy small { color: #64748b; font-size: .72rem; }
 .ap-sidebar-close {
   display: grid;
   width: 34px;
@@ -497,7 +490,7 @@
   margin-bottom: 24px;
 }
 
-.ap-auth-logo img { height: 52px; width: 52px; margin-bottom: 12px; border-radius: 6px; object-fit: cover; background: #000; }
+.ap-auth-logo img { width: 150px; max-height: 100px; height: auto; margin-bottom: 12px; object-fit: contain; }
 
 .ap-auth-logo h1 { font-size: 1.2rem; font-weight: 700; }
 
@@ -806,15 +799,13 @@
 .ap-id-card-body,
 .ap-id-card-footer { position: relative; z-index: 1; }
 .ap-id-card-brand { display: flex; min-height: 23%; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 26px 0; color: #29263f; text-align: left; }
-.ap-id-card-mark { display: grid; width: 34px; height: 34px; flex: none; place-items: center; border: 1px solid #b68b27; border-radius: 50%; background: #fffdf7; color: #9a741e; font-family: Georgia, serif; font-size: 1.1rem; font-weight: 800; }
-.ap-id-card-brand-copy { display: grid; gap: 2px; }
-.ap-id-card-brand strong { font-family: Georgia, 'Times New Roman', serif; font-size: .82rem; letter-spacing: .08em; }
-.ap-id-card-brand small { color: #596078; font-size: .64rem; font-weight: 700; letter-spacing: .12em; }
+.ap-id-card-logo { display: block; width: 120px; max-height: 80px; height: auto; object-fit: contain; mix-blend-mode: multiply; }
 .ap-id-card-brand h2 { margin: 0 0 0 auto; color: #a8832d; font-family: Georgia, 'Times New Roman', serif; font-size: clamp(1.05rem, 2.4vw, 1.55rem); letter-spacing: .025em; }
 .ap-id-card-body { display: grid; min-height: 0; flex: 1; grid-template-columns: minmax(88px, 22%) minmax(0, 1fr) 128px; align-items: center; gap: 16px; padding: 2px 26px 5px; }
 .ap-id-card-photo { display: block; width: min(100%, 132px); aspect-ratio: 1; height: auto; justify-self: center; border: 3px solid #bd9637; border-radius: 50%; padding: 3px; object-fit: cover; background: #fff; }
 .ap-admin-student-photo { display: block; width: 160px; max-width: 100%; aspect-ratio: 4 / 5; border: 1px solid #dbe3ec; border-radius: 12px; object-fit: cover; background: #e2e8f0; }
-.ap-id-card-placeholder { display: grid; place-items: center; color: #9a741e; font-size: 1.5rem; font-weight: 700; }
+.ap-id-card-placeholder { display: grid; align-content: center; justify-items: center; gap: 3px; padding: 5px; color: #9a741e; font-size: 1.5rem; font-weight: 700; }
+.ap-id-card-placeholder small { color: #64748b; font-size: .5rem; font-weight: 700; line-height: 1.1; text-align: center; }
 .ap-id-card-details { min-width: 0; }
 .ap-id-card-details dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
 .ap-id-card-details dl > div { display: grid; min-width: 0; align-content: start; gap: 4px; padding: 7px 9px; border-left: 2px solid rgba(182, 139, 39, .72); border-radius: 0 6px 6px 0; background: rgba(255, 255, 255, .72); }
@@ -873,10 +864,8 @@
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
-  .ap-id-card-brand { min-height: 12mm; flex: 0 0 12mm; gap: 1.5mm; padding: 1mm 4mm 0; }
-  .ap-id-card-mark { width: 6mm; height: 6mm; font-size: 7pt; }
-  .ap-id-card-brand strong { font-size: 6pt; }
-  .ap-id-card-brand small { font-size: 4.5pt; }
+  .ap-id-card-brand { min-height: 15mm; flex: 0 0 15mm; gap: 1.5mm; padding: 1mm 4mm 0; }
+  .ap-id-card-logo { width: 20mm; max-height: 13mm; }
   .ap-id-card-brand h2 { margin-left: 2mm; font-size: 10pt; }
   .ap-id-card-body { flex: 1 1 auto; grid-template-columns: 17mm minmax(0, 1fr) 18mm; gap: 1.5mm; padding: 0 4mm 1mm; }
   .ap-id-card-photo { width: 17mm; padding: .6mm; border-width: .5mm; }
@@ -896,7 +885,7 @@
 }
 
 /* ── responsive ─────────────────────────────────────────────────────────── */
-@media (max-width: 720px) {
+@media (max-width: 900px) {
   .ap-shell { display: block; }
   .ap-mobile-header {
     position: sticky;
@@ -924,7 +913,8 @@
     cursor: pointer;
   }
   .ap-menu-button span { display: block; width: 17px; height: 2px; border-radius: 2px; background: #334155; }
-  .ap-mobile-brand { color: var(--dark); font-size: .95rem; font-weight: 700; text-decoration: none; }
+  .ap-mobile-brand { display: block; flex: none; text-decoration: none; }
+  .ap-mobile-brand img { display: block; width: 82px; height: auto; max-height: 55px; object-fit: contain; }
   .ap-sidebar {
     position: fixed;
     top: 0;
@@ -999,13 +989,9 @@
 
 @media screen and (max-width: 640px) {
   .ap-id-card { min-height: 350px; aspect-ratio: auto; }
-  .ap-id-card-brand { display: grid; min-height: 88px; grid-template-columns: 30px minmax(0, 1fr); grid-template-areas: "mark copy" "title title"; justify-content: initial; gap: 5px 8px; padding: 14px 16px 0; }
-  .ap-id-card-mark { grid-area: mark; }
-  .ap-id-card-brand-copy { grid-area: copy; }
+  .ap-id-card-brand { display: grid; min-height: 110px; grid-template-columns: minmax(0, 1fr); grid-template-areas: "logo" "title"; justify-content: initial; justify-items: center; gap: 5px; padding: 10px 16px 0; }
+  .ap-id-card-logo { grid-area: logo; width: 84px; max-height: 56px; }
   .ap-id-card-brand h2 { grid-area: title; margin: 0; text-align: center; }
-  .ap-id-card-mark { width: 30px; height: 30px; }
-  .ap-id-card-brand strong { font-size: .68rem; }
-  .ap-id-card-brand small { font-size: .55rem; }
   .ap-id-card-brand h2 { font-size: 1rem; }
   .ap-id-card-body { grid-template-columns: 78px minmax(0, 1fr); align-items: start; gap: 12px; padding: 8px 16px 12px; }
   .ap-id-card-photo { width: 72px; }

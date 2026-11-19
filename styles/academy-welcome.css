@@ -48,34 +48,16 @@
 
 .academy-brand {
   flex: 0 0 auto;
-  gap: 11px;
   color: var(--academy-ink);
   text-decoration: none;
 }
 
 .academy-brand img {
-  width: 42px;
-  height: 42px;
-  border-radius: 6px;
-  object-fit: cover;
-  background: #000;
-}
-
-.academy-brand span {
-  display: grid;
-  gap: 2px;
-}
-
-.academy-brand strong {
-  font-size: 1.1rem;
-  letter-spacing: .06em;
-}
-
-.academy-brand small {
-  color: var(--academy-muted);
-  font-size: .73rem;
-  letter-spacing: .04em;
-  text-transform: uppercase;
+  display: block;
+  width: 112px;
+  max-height: 76px;
+  height: auto;
+  object-fit: contain;
 }
 
 .academy-main-nav {
@@ -624,7 +606,7 @@
 .academy-portal-cta h2 { font-size: clamp(1.7rem, 2.8vw, 2.35rem); }
 .academy-portal-cta p:last-child { margin: 10px 0 0; color: var(--academy-muted); line-height: 1.6; }
 
-.academy-footer { border-top: 1px solid var(--academy-line); background: #f8fafc; }
+.academy-footer { border-top: 1px solid #182a44; color: #e2e8f0; background: #000; }
 .academy-footer-inner {
   min-height: 115px;
   flex-wrap: wrap;
@@ -633,11 +615,11 @@
   padding-top: 24px;
   padding-bottom: 24px;
 }
-.academy-brand-footer img { width: 36px; height: 36px; }
-.academy-brand-footer strong { font-size: .98rem; }
-.academy-brand-footer small { font-size: .67rem; }
-.academy-footer-inner > p { margin: 0; color: var(--academy-muted); font-size: .84rem; }
+.academy-brand-footer img { width: 112px; max-height: 76px; }
+.academy-footer-inner > p { margin: 0; color: #cbd5e1; font-size: .84rem; }
 .academy-footer-inner > div { display: flex; flex-wrap: wrap; gap: 18px; }
+.academy-footer-inner a { color: #cbd5e1; }
+.academy-footer-inner a:hover { color: #fff; }
 .academy-footer-inner > small { width: 100%; color: #94a3b8; font-size: .74rem; }
 
 .academy-application {
@@ -915,7 +897,7 @@
 @media (max-width: 680px) {
   .academy-container { width: min(100% - 36px, 520px); }
   .academy-header-inner { min-height: 70px; gap: 12px; }
-  .academy-brand img { width: 36px; height: 36px; }
+  .academy-brand img { width: 92px; max-height: 62px; }
   .academy-main-nav { display: none; }
   .academy-header-actions { gap: 12px; }
   .academy-login-link { font-size: .78rem; }

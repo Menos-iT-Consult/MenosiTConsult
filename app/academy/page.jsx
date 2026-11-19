@@ -52,11 +52,7 @@ export default function AcademyWelcomePage() {
       <header className="academy-header">
         <div className="academy-container academy-header-inner">
           <Link className="academy-brand" href="/academy" aria-label="MITA Academy home">
-            <img src="/assets/logo-black.png" alt="" />
-            <span>
-              <strong>MITA</strong>
-              <small>IT Academy</small>
-            </span>
+            <img src="/assets/academy-logo-white.png" alt="" />
           </Link>
           <nav className="academy-main-nav" aria-label="Main navigation">
             <a href="#programs">Programs</a>
@@ -217,8 +213,7 @@ export default function AcademyWelcomePage() {
       <footer className="academy-footer">
         <div className="academy-container academy-footer-inner">
           <Link className="academy-brand academy-brand-footer" href="/academy">
-            <img src="/assets/logo-black.png" alt="" />
-            <span><strong>MITA</strong><small>IT Academy</small></span>
+            <img src="/assets/academy-logo-black.png" alt="MITA IT Academy" />
           </Link>
           <p>Building practical skills for a connected world.</p>
           <div>

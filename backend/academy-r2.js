@@ -48,6 +48,40 @@ function publicBase() {
   return env('ACADEMY_R2_PUBLIC_BASE').replace(/\/+$/, '');
 }
 
+function getAcademyMediaKey(value) {
+  const isMediaKey = (key) =>
+    typeof key === 'string' &&
+    /^academy\/media\/\d{4}\/[a-zA-Z0-9_-]+\.(jpg|jpeg|png|webp|gif|avif)$/i.test(key);
+  if (isMediaKey(value)) return value;
+
+  const base = publicBase();
+  if (!base || typeof value !== 'string') return '';
+  try {
+    const baseUrl = new URL(base);
+    const valueUrl = new URL(value);
+    const basePath = baseUrl.pathname.replace(/\/+$/, '');
+    const pathPrefix = basePath ? `${basePath}/` : '/';
+    if (valueUrl.origin !== baseUrl.origin || !valueUrl.pathname.startsWith(pathPrefix)) return '';
+    const key = decodeURIComponent(valueUrl.pathname.slice(pathPrefix.length));
+    return isMediaKey(key) ? key : '';
+  } catch {
+    return '';
+  }
+}
+
+function getAcademyMediaMime(key) {
+  if (typeof key !== 'string' || !/^academy\/media\/\d{4}\//.test(key)) return '';
+  const extension = key.slice(key.lastIndexOf('.') + 1).toLowerCase();
+  return {
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    webp: 'image/webp',
+    gif: 'image/gif',
+    avif: 'image/avif',
+  }[extension] || '';
+}
+
 function getClient() {
   const academyBucket = bucket();
   if (!env('R2_ACCESS_KEY_ID') || !env('R2_SECRET_ACCESS_KEY') || !academyBucket) {
@@ -168,7 +202,7 @@ const PRIVATE_PHOTO_TYPES = {
 
 function isPrivatePhotoKey(key) {
   return typeof key === 'string' &&
-    /^academy\/private\/student-photos\/\d{4}\/[a-f0-9]{40}\.(jpg|png|webp)$/.test(key);
+    /^academy\/private\/student-photos\/\d{4}\/[a-f0-9]{40}\.(jpg|jpeg|png|webp)$/.test(key);
 }
 
 async function putPrivatePhoto(buffer, mime) {
@@ -201,7 +235,9 @@ async function getPrivatePhoto(key) {
     Key: key,
   }));
   const extension = key.slice(key.lastIndexOf('.') + 1);
-  const mime = Object.keys(PRIVATE_PHOTO_TYPES).find((type) => PRIVATE_PHOTO_TYPES[type] === extension);
+  const mime = extension === 'jpeg'
+    ? 'image/jpeg'
+    : Object.keys(PRIVATE_PHOTO_TYPES).find((type) => PRIVATE_PHOTO_TYPES[type] === extension);
   return { bytes: Buffer.from(await result.transformToByteArray()), mime };
 }
 
@@ -282,6 +318,8 @@ module.exports = {
   r2Enabled: academyR2Enabled,
   certificateStorageEnabled: academyCertificateStorageEnabled,
   publicBase,
+  getAcademyMediaKey,
+  getAcademyMediaMime,
   putImage,
   getImageBytes,
   presignPut,

@@ -48,7 +48,7 @@ export default function InstructorSetupPage() {
     <main className="ap-auth">
       <section className="ap-auth-card">
         <div className="ap-auth-logo">
-          <img src="/assets/logo-black.png" alt="" />
+          <img src="/assets/academy-logo-white.png" alt="MITA IT Academy" />
           <h1>Set up your instructor account</h1>
           <p>Choose a password to activate your MITA Academy account.</p>
         </div>

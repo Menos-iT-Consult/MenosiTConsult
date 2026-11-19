@@ -288,11 +288,7 @@ export default function PortalShell({ portal, children }) {
             aria-label={config.title}
             onClick={closeMobileMenu}
           >
-            <span className="ap-sidebar-logo" aria-hidden="true">M</span>
-            <span className="ap-sidebar-brand-copy">
-              <strong>{config.title}</strong>
-              <small>{config.subtitle}</small>
-            </span>
+            <img className="ap-sidebar-logo" src="/assets/academy-logo-white.png" alt="" />
           </Link>
           <button
             className="ap-sidebar-close"
@@ -376,7 +372,13 @@ export default function PortalShell({ portal, children }) {
             <span aria-hidden="true" />
             <span aria-hidden="true" />
           </button>
-          <Link href={config.links[0].href} className="ap-mobile-brand">{config.title}</Link>
+          <Link
+            href={config.links[0].href}
+            className="ap-mobile-brand"
+            aria-label={config.title}
+          >
+            <img src="/assets/academy-logo-white.png" alt="" />
+          </Link>
         </header>
         {children}
       </div>

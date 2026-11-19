@@ -138,6 +138,15 @@ test('Academy R2 requires its own bucket and rejects the main-site bucket', asyn
     assert.equal(academyR2.r2Enabled(), true);
     assert.equal(academyR2.certificateStorageEnabled(), true);
     assert.equal(academyR2.publicBase(), 'https://academy-media.example.test');
+    const mediaKey = 'academy/media/2026/student-photo.jpg';
+    assert.equal(academyR2.getAcademyMediaKey(mediaKey), mediaKey);
+    assert.equal(
+      academyR2.getAcademyMediaKey(`https://academy-media.example.test/${mediaKey}?cache=1`),
+      mediaKey
+    );
+    assert.equal(academyR2.getAcademyMediaKey(`https://other.example.test/${mediaKey}`), '');
+    assert.equal(academyR2.getAcademyMediaKey('academy/media/2026/../student.jpg'), '');
+    assert.equal(academyR2.getAcademyMediaMime('academy/media/2026/photo.jpeg'), 'image/jpeg');
 
     process.env.ACADEMY_CERTIFICATE_R2_BUCKET = 'ACADEMY-MEDIA';
     assert.equal(academyR2.certificateStorageEnabled(), false);
@@ -155,6 +164,10 @@ test('Academy R2 requires its own bucket and rejects the main-site bucket', asyn
     );
     assert.equal(
       academyR2.isPrivatePhotoKey('academy/private/student-photos/2026/0123456789abcdef0123456789abcdef01234567.jpg'),
+      true
+    );
+    assert.equal(
+      academyR2.isPrivatePhotoKey('academy/private/student-photos/2026/0123456789abcdef0123456789abcdef01234567.jpeg'),
       true
     );
     assert.equal(academyR2.isPrivatePhotoKey('academy/media/2026/student.jpg'), false);

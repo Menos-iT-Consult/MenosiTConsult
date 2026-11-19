@@ -13,10 +13,17 @@ export async function GET(request, { params }) {
     const { id } = await params;
     const student = await academy.getStudent(id);
     if (!student) return NextResponse.json({ error: 'Student not found.' }, { status: 404 });
-    if (!storage.isPrivatePhotoKey(student.photo)) {
-      return NextResponse.json({ error: 'Passport photo not found.' }, { status: 404 });
+    let photo;
+    if (storage.isPrivatePhotoKey(student.photo)) {
+      photo = await storage.getPrivatePhoto(student.photo);
+    } else {
+      const key = storage.getAcademyMediaKey(student.photo);
+      if (!key) return NextResponse.json({ error: 'Passport photo not found.' }, { status: 404 });
+      photo = {
+        bytes: await storage.getImageBytes(key),
+        mime: storage.getAcademyMediaMime(key),
+      };
     }
-    const photo = await storage.getPrivatePhoto(student.photo);
     return new NextResponse(photo.bytes, {
       headers: {
         'Cache-Control': 'private, no-store',

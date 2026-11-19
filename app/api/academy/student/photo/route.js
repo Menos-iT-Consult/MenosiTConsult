@@ -16,10 +16,17 @@ export async function GET(request) {
     if (!student || student.status !== 'active') {
       return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
     }
-    if (!storage.isPrivatePhotoKey(student.photo)) {
-      return NextResponse.json({ error: 'Passport photo not found.' }, { status: 404 });
+    let photo;
+    if (storage.isPrivatePhotoKey(student.photo)) {
+      photo = await storage.getPrivatePhoto(student.photo);
+    } else {
+      const key = storage.getAcademyMediaKey(student.photo);
+      if (!key) return NextResponse.json({ error: 'Passport photo not found.' }, { status: 404 });
+      photo = {
+        bytes: await storage.getImageBytes(key),
+        mime: storage.getAcademyMediaMime(key),
+      };
     }
-    const photo = await storage.getPrivatePhoto(student.photo);
     return new NextResponse(photo.bytes, {
       headers: {
         'Cache-Control': 'private, no-store',
