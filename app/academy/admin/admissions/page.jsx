@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 
 function fullName(student) {
   return [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ');
@@ -86,33 +85,12 @@ export default function AcademyAdmissionsAdminPage() {
     }
   }
 
-  async function signOut() {
-    setError('');
-    try {
-      const response = await fetch('/api/academy/staff/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error('Could not sign out. Please try again.');
-      router.replace('/academy/admin/login');
-    } catch (signOutError) {
-      setError(signOutError.message || 'Could not sign out.');
-    }
-  }
-
   return (
-    <div className="ap">
-      <main className="ap-main">
+    <main className="ap-main">
         <header className="ap-page-head ap-admin-heading">
           <div>
             <h1>Admission applications</h1>
             <p>Review applications and approve students. Approval activates portal access and sends the Student ID by SMS.</p>
-          </div>
-          <div className="ap-actions">
-            <Link className="ap-button" href="/academy/admin/students">Students</Link>
-            <Link className="ap-button" href="/academy/admin/instructors">Instructor accounts</Link>
-            <Link className="ap-button" href="/academy/admin/announcements">Announcements</Link>
-            <button className="ap-button" onClick={signOut}>Sign out</button>
           </div>
         </header>
 
@@ -204,6 +182,5 @@ export default function AcademyAdmissionsAdminPage() {
           ) : null}
         </section>
       </main>
-    </div>
   );
 }

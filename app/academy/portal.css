@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   MITA Student Portal — app/academy/**
-   Light top nav (not an admin sidebar), off-white canvas, brand blue accents.
+   MITA Academy Portals — app/academy/** and app/instructor/**
+   Off-white canvas, brand blue accents, shared responsive sidebar navigation.
    Reuses shared tokens/classes from app/styles/base.css (.btn, .form-group…).
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -12,6 +12,161 @@
   display: flex;
   flex-direction: column;
 }
+
+/* ── portal shell and sidebar ──────────────────────────────────────────── */
+.ap-shell {
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr);
+  min-height: 100vh;
+  background: #f4f7fb;
+}
+
+.ap-shell.is-collapsed { grid-template-columns: 78px minmax(0, 1fr); }
+.ap-workspace { min-width: 0; }
+.ap-sidebar {
+  position: sticky;
+  top: 0;
+  z-index: 45;
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  flex-direction: column;
+  overflow: hidden auto;
+  padding: 18px 14px;
+  background: #fff;
+  border-right: 1px solid #e2e8f0;
+}
+
+.ap-sidebar-top {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 30px;
+}
+
+.ap-sidebar-brand {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  color: var(--dark);
+  text-decoration: none;
+}
+
+.ap-sidebar-logo {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--blue);
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.ap-sidebar-brand-copy { display: grid; min-width: 0; gap: 3px; }
+.ap-sidebar-brand-copy strong { overflow: hidden; font-size: .9rem; text-overflow: ellipsis; white-space: nowrap; }
+.ap-sidebar-brand-copy small { color: #64748b; font-size: .72rem; }
+.ap-sidebar-collapse, .ap-sidebar-close {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  place-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  color: #475569;
+  cursor: pointer;
+}
+
+.ap-sidebar-collapse:hover, .ap-sidebar-close:hover { background: #f1f5f9; }
+.ap-sidebar-chevron {
+  width: 8px;
+  height: 8px;
+  border-top: 1.5px solid currentColor;
+  border-right: 1.5px solid currentColor;
+  transform: rotate(225deg);
+  transition: transform .18s ease;
+}
+.is-collapsed .ap-sidebar-chevron { transform: rotate(45deg); }
+.ap-sidebar-close { display: none; font-size: 1.4rem; line-height: 1; }
+.ap-sidebar-nav { display: grid; gap: 5px; }
+.ap-sidebar-section-label {
+  margin: 0 0 7px 10px;
+  color: #94a3b8;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.ap-sidebar-link, .ap-sidebar-signout {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: #475569;
+  font: inherit;
+  font-size: .88rem;
+  font-weight: 550;
+  text-align: left;
+  text-decoration: none;
+  transition: background .15s, color .15s;
+}
+
+.ap-sidebar-link:hover, .ap-sidebar-signout:hover { background: #f1f5f9; color: var(--dark); }
+.ap-sidebar-link.is-active {
+  background: rgba(0, 119, 182, .09);
+  color: var(--blue);
+  font-weight: 650;
+}
+
+.ap-sidebar-icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  place-items: center;
+  border-radius: 9px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: .61rem;
+  font-weight: 750;
+  letter-spacing: -.02em;
+}
+
+.ap-sidebar-link.is-active .ap-sidebar-icon { background: #fff; color: var(--blue); }
+.ap-sidebar-bottom { display: grid; gap: 8px; margin-top: auto; padding-top: 18px; }
+.ap-sidebar-signout { width: 100%; cursor: pointer; }
+.ap-sidebar-signout:disabled { cursor: wait; opacity: .65; }
+.ap-sidebar-error { margin: 0; color: #b91c1c; font-size: .78rem; line-height: 1.5; }
+.ap-sidebar-scrim, .ap-mobile-header { display: none; }
+.ap-sidebar-link:focus-visible, .ap-sidebar-signout:focus-visible,
+.ap-sidebar-collapse:focus-visible, .ap-sidebar-close:focus-visible,
+.ap-menu-button:focus-visible {
+  outline: 3px solid rgba(0, 119, 182, .38);
+  outline-offset: 2px;
+}
+
+.is-collapsed .ap-sidebar { align-items: center; padding-right: 10px; padding-left: 10px; }
+.is-collapsed .ap-sidebar-top { width: 100%; justify-content: center; }
+.is-collapsed .ap-sidebar-brand { flex: 0 0 auto; }
+.is-collapsed .ap-sidebar-brand-copy { display: grid; }
+.is-collapsed .ap-sidebar-section-label { display: block; }
+.is-collapsed .ap-sidebar-label { display: inline; }
+.is-collapsed .ap-sidebar-collapse { position: absolute; top: 58px; right: 7px; }
+.is-collapsed .ap-sidebar-nav, .is-collapsed .ap-sidebar-bottom { width: 100%; }
+.is-collapsed .ap-sidebar-link, .is-collapsed .ap-sidebar-signout { justify-content: center; padding: 7px; }
+.is-collapsed .ap-sidebar-icon { width: 34px; height: 34px; }
 
 /* ── top navigation ─────────────────────────────────────────────────────── */
 .ap-nav {
@@ -630,8 +785,88 @@
 .ap-instructor-course small { margin-left: auto; }
 .ap-button-danger { color: #b91c1c; border-color: rgba(220, 38, 38, .25); }
 
+@media (prefers-reduced-motion: reduce) {
+  .ap-sidebar-chevron, .ap-sidebar-link, .ap-sidebar-signout, .ap-sidebar,
+  .ap-sidebar-scrim { transition: none; }
+}
+
 /* ── responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 720px) {
+  .ap-shell, .ap-shell.is-collapsed { display: block; }
+  .ap-mobile-header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    display: flex;
+    min-height: 60px;
+    align-items: center;
+    gap: 14px;
+    padding: 0 18px;
+    border-bottom: 1px solid #e2e8f0;
+    background: rgba(255, 255, 255, .96);
+    backdrop-filter: blur(12px);
+  }
+  .ap-menu-button {
+    display: grid;
+    width: 40px;
+    height: 40px;
+    align-content: center;
+    justify-items: center;
+    gap: 5px;
+    border: 1px solid #e2e8f0;
+    border-radius: 11px;
+    background: #fff;
+    cursor: pointer;
+  }
+  .ap-menu-button span { display: block; width: 17px; height: 2px; border-radius: 2px; background: #334155; }
+  .ap-mobile-brand { color: var(--dark); font-size: .95rem; font-weight: 700; text-decoration: none; }
+  .ap-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 70;
+    width: min(86vw, 300px);
+    height: 100vh;
+    height: 100dvh;
+    padding: 18px 14px;
+    box-shadow: 12px 0 32px rgba(15, 23, 42, .16);
+    transform: translateX(-105%);
+    transition: transform .2s ease, visibility .2s ease;
+    visibility: hidden;
+  }
+  .is-mobile-open .ap-sidebar { transform: translateX(0); visibility: visible; }
+  .ap-sidebar-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 65;
+    display: block;
+    border: 0;
+    background: rgba(15, 23, 42, .42);
+    opacity: 0;
+    transition: opacity .2s ease, visibility .2s ease;
+    visibility: hidden;
+  }
+  .is-mobile-open .ap-sidebar-scrim { opacity: 1; visibility: visible; }
+  .ap-sidebar-close { display: grid; }
+  .ap-sidebar-collapse { display: none; }
+  .is-collapsed .ap-sidebar { align-items: stretch; padding-right: 14px; padding-left: 14px; }
+  .is-collapsed .ap-sidebar-top { width: auto; justify-content: space-between; }
+  .is-collapsed .ap-sidebar-brand { flex: 1; }
+  .is-collapsed .ap-sidebar-collapse { position: static; }
+  .is-collapsed .ap-sidebar-nav, .is-collapsed .ap-sidebar-bottom { width: auto; }
+  .ap-sidebar-brand-copy,
+  .ap-sidebar-section-label,
+  .ap-sidebar-label { display: initial; }
+  .ap-sidebar-brand-copy { display: grid; }
+  .ap-sidebar-section-label { display: block; }
+  .ap-sidebar-link, .ap-sidebar-signout,
+  .is-collapsed .ap-sidebar-link, .is-collapsed .ap-sidebar-signout {
+    justify-content: flex-start;
+    padding: 8px 10px;
+  }
+  .ap-sidebar-icon, .is-collapsed .ap-sidebar-icon { width: 28px; height: 28px; }
+  .ap-shell, .ap-workspace { min-width: 0; max-width: 100%; }
   .ap-links {
     display: flex;
     min-width: 0;

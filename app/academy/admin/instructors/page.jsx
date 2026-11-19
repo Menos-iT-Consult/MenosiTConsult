@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 export default function AcademyInstructorAdminPage() {
@@ -203,33 +202,12 @@ export default function AcademyInstructorAdminPage() {
     await updateInstructor(member, { courseIds: selectedCourses[member.id] || [] });
   }
 
-  async function signOut() {
-    setError('');
-    try {
-      const response = await fetch('/api/academy/staff/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error('Could not sign out. Please try again.');
-      router.replace('/academy/admin/login');
-    } catch (signOutError) {
-      setError(signOutError.message || 'Could not sign out.');
-    }
-  }
-
   return (
-    <div className="ap">
       <main className="ap-main">
         <header className="ap-page-head ap-admin-heading">
           <div>
             <h1>Instructor accounts</h1>
             <p>Issue invitations, moderate access, and assign courses.</p>
-          </div>
-          <div className="ap-actions">
-            <Link className="ap-button" href="/academy/admin/admissions">Admissions</Link>
-            <Link className="ap-button" href="/academy/admin/students">Students</Link>
-            <Link className="ap-button" href="/academy/admin/announcements">Announcements</Link>
-            <button className="ap-button" onClick={signOut}>Sign out</button>
           </div>
         </header>
 
@@ -405,6 +383,5 @@ export default function AcademyInstructorAdminPage() {
           ) : null}
         </section>
       </main>
-    </div>
   );
 }

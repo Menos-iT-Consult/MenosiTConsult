@@ -52,20 +52,6 @@ export default function InstructorDashboard() {
 
   useEffect(() => { load(); }, [load]);
 
-  async function signOut() {
-    setError('');
-    try {
-      const response = await fetch('/api/academy/staff/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error('Could not sign out. Please try again.');
-      router.replace('/instructor/login');
-    } catch (signOutError) {
-      setError(signOutError.message || 'Could not sign out.');
-    }
-  }
-
   const now = Date.now();
   const upcoming = assignments
     .filter((assignment) => assignment.dueAt && new Date(assignment.dueAt).getTime() >= now)
@@ -73,7 +59,6 @@ export default function InstructorDashboard() {
     .slice(0, 5);
 
   return (
-    <div className="ap">
       <main className="ap-main">
         <header className="ap-page-head">
           <div>
@@ -81,7 +66,6 @@ export default function InstructorDashboard() {
             <h1>{staff ? `Welcome, ${staff.name}` : 'Instructor dashboard'}</h1>
             <p>Manage your assigned courses, student work, and teaching plans.</p>
           </div>
-          <button className="ap-button" onClick={signOut}>Sign out</button>
         </header>
 
         {error && <div className="ap-error" role="alert">{error}</div>}
@@ -102,7 +86,7 @@ export default function InstructorDashboard() {
               </article>
             </section>
 
-            <section className="ap-section">
+            <section className="ap-section" id="course-progress">
               <h2>Course progress</h2>
               {progress.length ? (
                 <div className="ap-course-grid">
@@ -132,7 +116,7 @@ export default function InstructorDashboard() {
               )}
             </section>
 
-            <section className="ap-section">
+            <section className="ap-section" id="my-courses">
               <div className="ap-section-heading">
                 <div>
                   <h2>My courses</h2>
@@ -160,7 +144,7 @@ export default function InstructorDashboard() {
               )}
             </section>
 
-            <section className="ap-section">
+            <section className="ap-section" id="upcoming-deadlines">
               <h2>Upcoming deadlines</h2>
               {upcoming.length ? (
                 <div className="ap-card ap-stack">
@@ -181,6 +165,5 @@ export default function InstructorDashboard() {
           </>
         )}
       </main>
-    </div>
   );
 }

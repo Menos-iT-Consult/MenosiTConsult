@@ -1,4 +1,4 @@
-import StudentPortalNav from './StudentPortalNav';
+import PortalShell from '../PortalShell';
 
 export const metadata = {
   title: 'MITA Student Portal',
@@ -7,12 +7,7 @@ export const metadata = {
 };
 
 function AcademyRootLayout({ children }) {
-  return (
-    <div className="ap">
-      <StudentPortalNav />
-      {children}
-    </div>
-  );
+  return <PortalShell portal="student">{children}</PortalShell>;
 }
 
 export default AcademyRootLayout;

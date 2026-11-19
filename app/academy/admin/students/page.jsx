@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 
 const EMPTY_FILTERS = {
   q: '',
@@ -66,20 +65,6 @@ export default function AcademyStudentsAdminPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  async function signOut() {
-    setError('');
-    try {
-      const response = await fetch('/api/academy/staff/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error('Could not sign out. Please try again.');
-      router.replace('/academy/admin/login');
-    } catch (signOutError) {
-      setError(signOutError.message || 'Could not sign out.');
-    }
-  }
-
   function applyFilters(event) {
     event.preventDefault();
     setPage(0);
@@ -93,18 +78,11 @@ export default function AcademyStudentsAdminPage() {
   }
 
   return (
-    <div className="ap">
       <main className="ap-main">
         <header className="ap-page-head ap-admin-heading">
           <div>
             <h1>Student directory</h1>
             <p>Search student accounts, enrollments, and admission SMS status.</p>
-          </div>
-          <div className="ap-actions">
-            <Link className="ap-button" href="/academy/admin/admissions">Admissions</Link>
-            <Link className="ap-button" href="/academy/admin/instructors">Instructors & courses</Link>
-            <Link className="ap-button" href="/academy/admin/announcements">Announcements</Link>
-            <button className="ap-button" onClick={signOut}>Sign out</button>
           </div>
         </header>
 
@@ -223,6 +201,5 @@ export default function AcademyStudentsAdminPage() {
           </button>
         </nav>
       </main>
-    </div>
   );
 }

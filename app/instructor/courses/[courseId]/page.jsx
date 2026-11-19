@@ -147,20 +147,6 @@ export default function InstructorCoursePage() {
 
   useEffect(() => { loadLessons(); }, [loadLessons]);
 
-  async function signOut() {
-    setError('');
-    try {
-      const response = await fetch('/api/academy/staff/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error('Could not sign out. Please try again.');
-      router.replace('/instructor/login');
-    } catch (signOutError) {
-      setError(signOutError.message || 'Could not sign out.');
-    }
-  }
-
   async function createAssignment(event) {
     event.preventDefault();
     setSaving('assignment');
@@ -330,22 +316,19 @@ export default function InstructorCoursePage() {
   }
 
   if (loading) {
-    return <div className="ap"><main className="ap-main"><p>Loading course workspace…</p></main></div>;
+    return <main className="ap-main"><p>Loading course workspace…</p></main>;
   }
 
   if (!course) {
     return (
-      <div className="ap">
-        <main className="ap-main">
-          <div className="ap-error" role="alert">{error || 'Course not found or not assigned to your account.'}</div>
-          <Link className="ap-button" href="/instructor/dashboard">Back to dashboard</Link>
-        </main>
-      </div>
+      <main className="ap-main">
+        <div className="ap-error" role="alert">{error || 'Course not found or not assigned to your account.'}</div>
+        <Link className="ap-button" href="/instructor/dashboard">Back to dashboard</Link>
+      </main>
     );
   }
 
   return (
-    <div className="ap">
       <main className="ap-main">
         <header className="ap-page-head">
           <div>
@@ -354,7 +337,6 @@ export default function InstructorCoursePage() {
             <h1>{course.title}</h1>
             <p>{course.description}</p>
           </div>
-          <button className="ap-button" onClick={signOut}>Sign out</button>
         </header>
 
         {error && <div className="ap-error" role="alert">{error}</div>}
@@ -633,6 +615,5 @@ export default function InstructorCoursePage() {
           </section>
         )}
       </main>
-    </div>
   );
 }
