@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
   normalizeAmount,
   validateDiscount,
+  normalizeScholarshipInput,
   normalizeProgramInput,
   calculateSemesterFee,
 } = require('../lib/academy-finance');
@@ -36,6 +37,28 @@ test('validates administrator program setup and per-semester tuition', () => {
     code: 'BAD',
     durationSemesters: 4,
     feePerSemester: '-1',
+  }), null);
+});
+
+test('normalizes editable scholarship details and rejects invalid values', () => {
+  assert.deepEqual(normalizeScholarshipInput({
+    name: '  Access Scholarship ',
+    description: '  Supports eligible learners. ',
+    programId: '  program-1 ',
+    discountType: 'percentage',
+    discountValue: '25.5',
+  }), {
+    name: 'Access Scholarship',
+    description: 'Supports eligible learners.',
+    programId: 'program-1',
+    discountType: 'percentage',
+    discountValue: 25.5,
+  });
+  assert.equal(normalizeScholarshipInput({
+    name: 'Invalid scholarship',
+    programId: 123,
+    discountType: 'fixed',
+    discountValue: '100',
   }), null);
 });
 

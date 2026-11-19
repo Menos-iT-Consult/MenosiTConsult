@@ -87,6 +87,8 @@ export async function middleware(request) {
     pathname === '/academy/register' ||
     pathname === '/academy/terms' ||
     pathname === '/academy/privacy' ||
+    pathname === '/academy/verify' ||
+    pathname.startsWith('/academy/verify/') ||
     pathname === '/academy'
   ) {
     return NextResponse.next();

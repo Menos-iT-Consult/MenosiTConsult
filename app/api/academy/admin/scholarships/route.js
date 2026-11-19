@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 const academy = require('../../../../../backend/academy-db');
 const staffAuth = require('../../../../../lib/academy-staff');
-const { validateDiscount } = require('../../../../../lib/academy-finance');
+const { normalizeScholarshipInput } = require('../../../../../lib/academy-finance');
 const { noDbErrorResponse } = require('../../../../../lib/api-helpers');
 
 export async function GET(request) {
@@ -24,32 +24,18 @@ export async function POST(request) {
     const gate = await staffAuth.requireAdministrator(request);
     if (gate.error) return NextResponse.json({ error: gate.error }, { status: gate.status });
     const body = await request.json().catch(() => ({}));
-    const value = body && typeof body === 'object' ? body : {};
-    const name = typeof value.name === 'string' ? value.name.trim() : '';
-    const description = typeof value.description === 'string' ? value.description.trim() : '';
-    const programId = typeof value.programId === 'string' ? value.programId.trim() : '';
-    const discountType = value.discountType;
-    const discountValue = validateDiscount(discountType, value.discountValue);
-    if (
-      !name || name.length > 120 || description.length > 1000 ||
-      (value.programId != null && typeof value.programId !== 'string') ||
-      (programId && !(await academy.getProgram(programId))) ||
-      discountValue == null
-    ) {
+    const scholarship = normalizeScholarshipInput(body);
+    if (!scholarship || (scholarship.programId && !(await academy.getProgram(scholarship.programId)))) {
       return NextResponse.json(
         { error: 'Provide a name, valid program (or all programs), and a positive fixed or percentage discount (up to 100%).' },
         { status: 400 }
       );
     }
-    const scholarship = await academy.createScholarship({
-      name,
-      description,
-      programId,
-      discountType,
-      discountValue,
+    const created = await academy.createScholarship({
+      ...scholarship,
       createdBy: gate.staff.id,
     });
-    return NextResponse.json({ scholarship }, { status: 201 });
+    return NextResponse.json({ scholarship: created }, { status: 201 });
   } catch (error) {
     const noDb = noDbErrorResponse(error);
     if (noDb) return noDb;
@@ -63,15 +49,36 @@ export async function PATCH(request) {
     const gate = await staffAuth.requireAdministrator(request);
     if (gate.error) return NextResponse.json({ error: gate.error }, { status: gate.status });
     const body = await request.json().catch(() => ({}));
-    if (!body || typeof body.id !== 'string' || typeof body.active !== 'boolean') {
-      return NextResponse.json({ error: 'Provide a scholarship ID and active state.' }, { status: 400 });
+    if (!body || typeof body !== 'object' || Array.isArray(body) || typeof body.id !== 'string') {
+      return NextResponse.json({ error: 'Provide a valid scholarship ID.' }, { status: 400 });
     }
-    const scholarship = await academy.setScholarshipActive(body.id, body.active);
-    if (!scholarship) return NextResponse.json({ error: 'Scholarship program not found.' }, { status: 404 });
+    if (typeof body.active === 'boolean' &&
+        Object.keys(body).every((key) => key === 'id' || key === 'active')) {
+      const scholarship = await academy.setScholarshipActive(body.id, body.active);
+      if (!scholarship) return NextResponse.json({ error: 'Scholarship program not found.' }, { status: 404 });
+      return NextResponse.json({ scholarship });
+    }
+
+    const updates = normalizeScholarshipInput(body);
+    if (!updates || (updates.programId && !(await academy.getProgram(updates.programId)))) {
+      return NextResponse.json(
+        { error: 'Provide a name, valid program (or all programs), and a positive fixed or percentage discount (up to 100%).' },
+        { status: 400 }
+      );
+    }
+    const updated = await academy.updateScholarship(body.id, updates);
+    if (!updated) return NextResponse.json({ error: 'Scholarship program not found.' }, { status: 404 });
+    const scholarship = await academy.getScholarship(body.id);
     return NextResponse.json({ scholarship });
   } catch (error) {
     const noDb = noDbErrorResponse(error);
     if (noDb) return noDb;
+    if (error.code === 'SCHOLARSHIP_SCOPE_CONFLICT') {
+      return NextResponse.json(
+        { error: 'This program scope excludes students already assigned this scholarship. Change it to All programs or update those student awards first.' },
+        { status: 409 }
+      );
+    }
     console.error('Academy scholarship update error:', error);
     return NextResponse.json({ error: 'Could not update the scholarship program.' }, { status: 500 });
   }

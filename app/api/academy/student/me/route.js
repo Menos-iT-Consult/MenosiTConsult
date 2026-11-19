@@ -42,6 +42,8 @@ export async function GET(request) {
       : student.photo,
     dob: student.dob,
     address: student.address,
+    city: student.city,
+    region: student.region,
     guardianName: student.guardianName,
     guardianPhone: student.guardianPhone,
     status: student.status,

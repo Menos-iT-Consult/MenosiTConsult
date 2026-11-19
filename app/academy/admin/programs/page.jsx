@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 const EMPTY_PROGRAM = {
   name: '',
@@ -83,9 +84,85 @@ function ProgramEditor({ program, onSave }) {
   );
 }
 
+function scholarshipFormFrom(scholarship) {
+  return {
+    name: scholarship.name,
+    description: scholarship.description || '',
+    programId: scholarship.programId || '',
+    discountType: scholarship.discountType,
+    discountValue: String(scholarship.discountValue),
+  };
+}
+
+function ScholarshipEditor({ scholarship, programs, onSave, saving, setSaving }) {
+  const [form, setForm] = useState(() => scholarshipFormFrom(scholarship));
+  const [error, setError] = useState('');
+
+  async function submit(event) {
+    event.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      const updated = await onSave(scholarship.id, {
+        ...form,
+        discountValue: Number(form.discountValue),
+      });
+      setForm(scholarshipFormFrom(updated));
+    } catch (saveError) {
+      setError(saveError.message || 'Could not update this scholarship.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <details className="ap-program-edit">
+      <summary>Edit scholarship details</summary>
+      <p className="ap-muted">Changes apply to students currently assigned this scholarship and future awards.</p>
+      {error && <div className="ap-error" role="alert">{error}</div>}
+      <form className="ap-form-grid" onSubmit={submit}>
+        <label>Scholarship name
+          <input className="ap-input" maxLength={120} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
+        </label>
+        <label>Applies to
+          <select className="ap-select" value={form.programId} onChange={(event) => setForm({ ...form, programId: event.target.value })}>
+            <option value="">All programs</option>
+            {programs.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}
+          </select>
+        </label>
+        <label>Discount type
+          <select className="ap-select" value={form.discountType} onChange={(event) => setForm({ ...form, discountType: event.target.value })}>
+            <option value="percentage">Percentage</option>
+            <option value="fixed">Fixed amount (GHS)</option>
+          </select>
+        </label>
+        <label>{form.discountType === 'percentage' ? 'Discount (%)' : 'Discount per semester (GHS)'}
+          <input
+            className="ap-input"
+            type="number"
+            min="0.01"
+            max={form.discountType === 'percentage' ? '100' : '999999999.99'}
+            step="0.01"
+            value={form.discountValue}
+            onChange={(event) => setForm({ ...form, discountValue: event.target.value })}
+            required
+          />
+        </label>
+        <label className="ap-form-wide">Description
+          <textarea className="ap-input ap-textarea" rows={2} maxLength={1000} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
+        </label>
+        <button className="ap-button ap-button-primary" type="submit" disabled={saving}>
+          {saving ? 'Saving…' : 'Save scholarship'}
+        </button>
+      </form>
+    </details>
+  );
+}
+
 export default function AcademyProgramsAdminPage() {
   const router = useRouter();
   const [programs, setPrograms] = useState([]);
+  const [courses, setCourses] = useState([]);
   const [scholarships, setScholarships] = useState([]);
   const [programForm, setProgramForm] = useState(EMPTY_PROGRAM);
   const [scholarshipForm, setScholarshipForm] = useState(EMPTY_SCHOLARSHIP);
@@ -98,26 +175,30 @@ export default function AcademyProgramsAdminPage() {
     setLoading(true);
     setError('');
     try {
-      const [programResponse, scholarshipResponse] = await Promise.all([
+      const [programResponse, scholarshipResponse, coursesResponse] = await Promise.all([
         fetch('/api/academy/admin/programs', { credentials: 'include' }),
         fetch('/api/academy/admin/scholarships', { credentials: 'include' }),
+        fetch('/api/academy/admin/courses', { credentials: 'include' }),
       ]);
-      const [programResult, scholarshipResult] = await Promise.all([
+      const [programResult, scholarshipResult, coursesResult] = await Promise.all([
         programResponse.json(),
         scholarshipResponse.json(),
+        coursesResponse.json(),
       ]);
-      if (programResponse.status === 401 || scholarshipResponse.status === 401) {
+      if (programResponse.status === 401 || scholarshipResponse.status === 401 || coursesResponse.status === 401) {
         router.replace('/academy/admin/login');
         return;
       }
-      if (programResponse.status === 403 || scholarshipResponse.status === 403) {
+      if (programResponse.status === 403 || scholarshipResponse.status === 403 || coursesResponse.status === 403) {
         router.replace('/academy/admin/login');
         return;
       }
       if (!programResponse.ok) throw new Error(programResult.error || 'Could not load programs.');
       if (!scholarshipResponse.ok) throw new Error(scholarshipResult.error || 'Could not load scholarship programs.');
+      if (!coursesResponse.ok) throw new Error(coursesResult.error || 'Could not load courses and instructors.');
       setPrograms(programResult.programs || []);
       setScholarships(scholarshipResult.scholarships || []);
+      setCourses(coursesResult.courses || []);
     } catch (loadError) {
       setError(loadError.message || 'Could not load Academy programs.');
     } finally {
@@ -233,6 +314,24 @@ export default function AcademyProgramsAdminPage() {
     }
   }
 
+  async function updateScholarship(id, changes) {
+    const response = await fetch('/api/academy/admin/scholarships', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ id, ...changes }),
+    });
+    const result = await response.json();
+    if (response.status === 401 || response.status === 403) {
+      router.replace('/academy/admin/login');
+      throw new Error(result.error || 'Administrator access is required.');
+    }
+    if (!response.ok) throw new Error(result.error || 'Could not update this scholarship.');
+    setNotice('Scholarship details updated.');
+    await load();
+    return result.scholarship;
+  }
+
   return (
     <main className="ap-main">
       <header className="ap-page-head ap-admin-heading">
@@ -294,6 +393,37 @@ export default function AcademyProgramsAdminPage() {
         ) : !error ? <div className="ap-card ap-empty"><p>No programs have been added.</p></div> : null}
       </section>
 
+      <section className="ap-section">
+        <div className="ap-card-heading">
+          <h2>Courses and instructors</h2>
+          <Link className="ap-link" href="/academy/admin/instructors">Manage courses and instructors</Link>
+        </div>
+        {loading ? <p>Loading courses and instructors…</p> : courses.length ? (
+          <div className="ap-table-wrap ap-card">
+            <table className="ap-table">
+              <thead>
+                <tr>
+                  <th scope="col">Course</th>
+                  <th scope="col">Program</th>
+                  <th scope="col">Semester</th>
+                  <th scope="col">Instructor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {courses.map((course) => (
+                  <tr key={course.id}>
+                    <td>{course.title}{course.code ? <small>{course.code} · {course.creditHours} credits</small> : null}</td>
+                    <td>{programs.find((program) => program.id === course.programId)?.name || 'No program'}</td>
+                    <td>{course.semesterNumber}</td>
+                    <td>{course.instructorName || 'Not assigned'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : !error ? <div className="ap-card ap-empty"><p>No courses have been created yet.</p></div> : null}
+      </section>
+
       <section className="ap-card ap-section">
         <h2>Add a scholarship program</h2>
         <p className="ap-muted">Scholarships are manually awarded by administrators. One scholarship can be assigned to each student.</p>
@@ -330,24 +460,35 @@ export default function AcademyProgramsAdminPage() {
         {scholarships.length ? (
           <div className="ap-stack">
             {scholarships.map((scholarship) => (
-              <article className="ap-card ap-card-heading" key={scholarship.id}>
+              <article className="ap-card" key={scholarship.id}>
                 <div>
-                  <h3>{scholarship.name}</h3>
-                  <p className="ap-muted">
-                    {scholarship.programName || 'All programs'} · {scholarship.discountType === 'percentage'
-                      ? `${scholarship.discountValue}%`
-                      : `GHS ${scholarship.discountValue.toFixed(2)} per semester`}
-                  </p>
+                  <div className="ap-card-heading">
+                    <div>
+                      <h3>{scholarship.name}</h3>
+                      <p className="ap-muted">
+                        {scholarship.programName || 'All programs'} · {scholarship.discountType === 'percentage'
+                          ? `${scholarship.discountValue}%`
+                          : `GHS ${scholarship.discountValue.toFixed(2)} per semester`}
+                      </p>
+                    </div>
+                    <button
+                      className="ap-button"
+                      type="button"
+                      onClick={() => toggleScholarship(scholarship)}
+                      disabled={saving === scholarship.id}
+                    >
+                      {saving === scholarship.id ? 'Saving…' : scholarship.active ? 'Pause' : 'Activate'}
+                    </button>
+                  </div>
                   {scholarship.description && <p>{scholarship.description}</p>}
                 </div>
-                <button
-                  className="ap-button"
-                  type="button"
-                  onClick={() => toggleScholarship(scholarship)}
-                  disabled={saving === scholarship.id}
-                >
-                  {saving === scholarship.id ? 'Saving…' : scholarship.active ? 'Pause' : 'Activate'}
-                </button>
+                <ScholarshipEditor
+                  scholarship={scholarship}
+                  programs={programs}
+                  onSave={updateScholarship}
+                  saving={saving === scholarship.id}
+                  setSaving={(isSaving) => setSaving(isSaving ? scholarship.id : '')}
+                />
               </article>
             ))}
           </div>

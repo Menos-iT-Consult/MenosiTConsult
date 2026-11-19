@@ -819,6 +819,50 @@ async function setScholarshipActive(id, active) {
   return rows[0] ? mapScholarship(rows[0]) : null;
 }
 
+async function updateScholarship(id, scholarship) {
+  return transaction(async (client) => {
+    const { rows: currentRows } = await client.query(
+      'SELECT id, program_id FROM academy_scholarships WHERE id = $1 FOR UPDATE',
+      [id]
+    );
+    if (!currentRows[0]) return null;
+
+    if (scholarship.programId && currentRows[0].program_id !== scholarship.programId) {
+      const { rows: assignedRows } = await client.query(
+        `SELECT 1
+           FROM academy_student_scholarships award
+           JOIN academy_students student ON student.id = award.student_id
+          WHERE award.scholarship_id = $1
+            AND student.program_id IS DISTINCT FROM $2
+          LIMIT 1`,
+        [id, scholarship.programId]
+      );
+      if (assignedRows.length) {
+        const error = new Error('The scholarship scope conflicts with students who already have this award.');
+        error.code = 'SCHOLARSHIP_SCOPE_CONFLICT';
+        throw error;
+      }
+    }
+
+    const { rows } = await client.query(
+      `UPDATE academy_scholarships
+          SET name = $2, description = $3, program_id = $4,
+              discount_type = $5, discount_value = $6, updated_at = now()
+        WHERE id = $1
+        RETURNING *`,
+      [
+        id,
+        scholarship.name,
+        scholarship.description || '',
+        scholarship.programId || null,
+        scholarship.discountType,
+        scholarship.discountValue,
+      ]
+    );
+    return rows[0] ? mapScholarship(rows[0]) : null;
+  });
+}
+
 async function getStudentScholarship(studentId) {
   const { rows } = await q(
     `SELECT scholarship.*, program.name AS program_name, award.assigned_by, award.assigned_at
@@ -2284,7 +2328,7 @@ module.exports = {
   createInstructorInvitation, rotateInstructorInvitation, acceptInstructorInvitation,
   // programs and scholarships
   listPrograms, getProgram, createProgram, updateProgram, deleteProgram,
-  listScholarships, getScholarship, createScholarship, setScholarshipActive,
+  listScholarships, getScholarship, createScholarship, updateScholarship, setScholarshipActive,
   getStudentScholarship, assignStudentScholarship,
   // courses
   createCourse, listCourses, getCourse, setInstructorCourses, isCourseAssignedToInstructor,
