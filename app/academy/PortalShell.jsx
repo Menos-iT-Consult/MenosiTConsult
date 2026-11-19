@@ -13,7 +13,9 @@ const PORTALS = {
     links: [
       { href: '/academy/dashboard', label: 'Dashboard', icon: 'dashboard' },
       { href: '/academy/courses', label: 'Courses', icon: 'courses' },
-      { href: '/academy/assignments', label: 'Assignments & exams', icon: 'assignments' },
+      { href: '/academy/assignments', label: 'Assignments', icon: 'assignments' },
+      { href: '/academy/fees', label: 'Fees', icon: 'fees' },
+      { href: '/academy/reports', label: 'Grades & exams', icon: 'reports' },
       { href: '/academy/attendance', label: 'Attendance', icon: 'attendance' },
       { href: '/academy/timetable', label: 'Timetable', icon: 'timetable' },
       {
@@ -74,6 +76,18 @@ function NavigationIcon({ name }) {
       <>
         <path d="M9 4h6M9 3h6v3H9z" />
         <path d="M7 5H5v16h14V5h-2M8 11h8M8 15h8" />
+      </>
+    ),
+    fees: (
+      <>
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <path d="M3 9h18M7 14h4M16 13v3M14.5 14.5h3" />
+      </>
+    ),
+    reports: (
+      <>
+        <path d="M4 20V4M4 20h17" />
+        <path d="m7 15 4-4 3 2 5-6M17 7h2v2" />
       </>
     ),
     attendance: (

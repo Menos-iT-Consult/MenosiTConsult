@@ -64,6 +64,7 @@ export default function ProfilePage() {
             <div><dt>Scholarship discount</dt><dd>{data.academicFees.currency} {data.academicFees.scholarshipDiscount.toFixed(2)}</dd></div>
             <div><dt>Amount due per semester</dt><dd><strong>{data.academicFees.currency} {data.academicFees.amountDue.toFixed(2)}</strong></dd></div>
           </dl>
+          <Link className="ap-link" href="/academy/fees">View fee and invoice details</Link>
         </section>
       )}
 

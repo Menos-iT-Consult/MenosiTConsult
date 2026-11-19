@@ -1077,10 +1077,12 @@ async function getStudentPortalData(studentId) {
         [studentId]
       ),
       q(
-        `SELECT id, session_id, title, amount, due_date, status
-           FROM academy_invoices
-          WHERE student_id = $1
-          ORDER BY due_date NULLS LAST`,
+        `SELECT i.id, i.session_id, i.title, i.amount, i.due_date, i.status,
+                s.name AS session_name
+           FROM academy_invoices i
+           LEFT JOIN academy_sessions s ON s.id = i.session_id
+          WHERE i.student_id = $1
+          ORDER BY i.due_date NULLS LAST`,
         [studentId]
       ),
       q(

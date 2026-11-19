@@ -74,12 +74,13 @@ export default function StudentDashboardPage() {
         <article className="ap-stat">
           <span>Upcoming exams</span>
           <strong>{upcomingExams.length}</strong>
-          <Link href="/academy/assignments">See exam dates</Link>
+          <Link href="/academy/reports">See exam dates</Link>
         </article>
         <article className="ap-stat">
           <span>Outstanding fees</span>
           <strong>{unpaidInvoices.length}</strong>
           <small>{currency(unpaidInvoices.reduce((sum, invoice) => sum + Number(invoice.amount || 0), 0))}</small>
+          <Link href="/academy/fees">View fees</Link>
         </article>
       </section>
 
@@ -109,7 +110,7 @@ export default function StudentDashboardPage() {
         <section className="ap-card">
           <div className="ap-card-heading">
             <h2>Next exams</h2>
-            <Link href="/academy/assignments">All dates</Link>
+            <Link href="/academy/reports">All dates</Link>
           </div>
           {upcomingExams.length ? (
             <ul className="ap-list">
