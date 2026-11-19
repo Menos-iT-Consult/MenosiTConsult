@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 
 const academy = require('../../../../backend/academy-db');
+const storage = require('../../../../backend/academy-r2');
 const { noDbErrorResponse } = require('../../../../lib/api-helpers');
+const { validatePassportPhoto } = require('../../../../lib/academy-passport-photo');
 const {
   getCountryRegions,
   isCountry,
@@ -25,8 +27,48 @@ const QUALIFICATIONS = new Set([
 // Creates a 'pending' student; staff admission issues credentials and sends
 // the Student ID and temporary password to the applicant by SMS.
 export async function POST(request) {
-  const payload = await request.json().catch(() => ({}));
+  const contentType = request.headers.get('content-type') || '';
+  if (!contentType.toLowerCase().startsWith('multipart/form-data;')) {
+    return NextResponse.json({ error: 'Submit the application with its required passport photo.' }, { status: 400 });
+  }
+  const contentLength = Number(request.headers.get('content-length'));
+  if (Number.isFinite(contentLength) && contentLength > 6 * 1024 * 1024) {
+    return NextResponse.json({ error: 'The application upload is too large.' }, { status: 413 });
+  }
+
+  let formData;
+  try {
+    formData = await request.formData();
+  } catch {
+    return NextResponse.json({ error: 'The application upload could not be read.' }, { status: 400 });
+  }
+  const application = formData.get('application');
+  let payload = {};
+  if (typeof application === 'string') {
+    try {
+      payload = JSON.parse(application);
+    } catch {
+      return NextResponse.json({ error: 'The application details are invalid.' }, { status: 400 });
+    }
+  }
   const body = payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : {};
+  const photoFile = formData.get('passportPhoto');
+  if (!photoFile || typeof photoFile.arrayBuffer !== 'function') {
+    return NextResponse.json({ error: 'A passport photo is required.' }, { status: 400 });
+  }
+  if (!storage.certificateStorageEnabled()) {
+    return NextResponse.json({ error: 'Private Academy photo storage is not configured.' }, { status: 503 });
+  }
+  let photoBytes;
+  try {
+    photoBytes = Buffer.from(await photoFile.arrayBuffer());
+  } catch {
+    return NextResponse.json({ error: 'The passport photo could not be read.' }, { status: 400 });
+  }
+  const photoError = validatePassportPhoto(photoBytes, photoFile.type);
+  if (photoError) {
+    return NextResponse.json({ error: photoError }, { status: 400 });
+  }
   const text = (key) => (typeof body[key] === 'string' ? body[key].trim() : '');
   const firstName = text('firstName');
   const middleName = text('middleName');
@@ -135,6 +177,7 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Please confirm your information and accept the Academy Terms and Conditions and Privacy Policy.' }, { status: 400 });
   }
 
+  let photoKey = '';
   try {
     const program = await academy.getProgram(programId);
     if (!program || !program.published) {
@@ -154,10 +197,13 @@ export async function POST(request) {
       );
     }
 
+    const storedPhoto = await storage.putPrivatePhoto(photoBytes, photoFile.type);
+    photoKey = storedPhoto.key;
     const student = await academy.createPendingStudent({
       firstName,
       middleName,
       lastName,
+      photo: photoKey,
       dob: dateOfBirth,
       gender,
       nationality,
@@ -176,7 +222,11 @@ export async function POST(request) {
       graduationYear,
       studyReason,
       programId,
+      confirmAccuracy: body.confirmAccuracy,
+      termsAccepted: body.termsAccepted,
+      privacyConsent: body.privacyConsent,
     });
+    photoKey = '';
 
     return NextResponse.json({
       success: true,
@@ -189,6 +239,13 @@ export async function POST(request) {
         'Application received. Once the admissions office reviews it, you will get your Student ID by SMS.',
     });
   } catch (err) {
+    if (photoKey) {
+      try {
+        await storage.deletePrivatePhoto(photoKey);
+      } catch (cleanupError) {
+        console.error('Failed to clean up passport photo after application failure:', cleanupError);
+      }
+    }
     const noDb = noDbErrorResponse(err);
     if (noDb) return noDb;
     console.error('Academy register error:', err);

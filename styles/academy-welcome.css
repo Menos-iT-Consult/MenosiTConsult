@@ -880,6 +880,15 @@
   to { transform: rotate(360deg); }
 }
 
+.academy-passport-photo-preview {
+  display: block;
+  width: 120px;
+  max-width: 100%;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .academy-art-ring-outer { animation: none; }
   .academy-button, .academy-program-card { transition: none; }

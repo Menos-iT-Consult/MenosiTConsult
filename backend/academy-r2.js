@@ -160,6 +160,62 @@ async function deletePrivatePdf(key) {
   }));
 }
 
+const PRIVATE_PHOTO_TYPES = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+};
+
+function isPrivatePhotoKey(key) {
+  return typeof key === 'string' &&
+    /^academy\/private\/student-photos\/\d{4}\/[a-f0-9]{40}\.(jpg|png|webp)$/.test(key);
+}
+
+async function putPrivatePhoto(buffer, mime) {
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+    throw new Error('A non-empty passport photo buffer is required.');
+  }
+  const extension = PRIVATE_PHOTO_TYPES[mime];
+  if (!extension) {
+    throw new Error('Unsupported private Academy passport photo type.');
+  }
+  const { PutObjectCommand } = require('@aws-sdk/client-s3');
+  const key = `academy/private/student-photos/${new Date().getFullYear()}/${crypto.randomBytes(20).toString('hex')}.${extension}`;
+  await getCertificateClient().send(new PutObjectCommand({
+    Bucket: certificateBucket(),
+    Key: key,
+    Body: buffer,
+    ContentType: mime,
+    CacheControl: 'private, no-store',
+  }));
+  return { key, size: buffer.length };
+}
+
+async function getPrivatePhoto(key) {
+  if (!isPrivatePhotoKey(key)) {
+    throw new Error('Invalid private Academy passport photo key.');
+  }
+  const { GetObjectCommand } = require('@aws-sdk/client-s3');
+  const result = await getCertificateClient().send(new GetObjectCommand({
+    Bucket: certificateBucket(),
+    Key: key,
+  }));
+  const extension = key.slice(key.lastIndexOf('.') + 1);
+  const mime = Object.keys(PRIVATE_PHOTO_TYPES).find((type) => PRIVATE_PHOTO_TYPES[type] === extension);
+  return { bytes: Buffer.from(await result.transformToByteArray()), mime };
+}
+
+async function deletePrivatePhoto(key) {
+  if (!isPrivatePhotoKey(key)) {
+    throw new Error('Invalid private Academy passport photo key.');
+  }
+  const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
+  await getCertificateClient().send(new DeleteObjectCommand({
+    Bucket: certificateBucket(),
+    Key: key,
+  }));
+}
+
 const EXT = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
@@ -232,4 +288,8 @@ module.exports = {
   putPrivatePdf,
   getPrivatePdfBytes,
   deletePrivatePdf,
+  isPrivatePhotoKey,
+  putPrivatePhoto,
+  getPrivatePhoto,
+  deletePrivatePhoto,
 };

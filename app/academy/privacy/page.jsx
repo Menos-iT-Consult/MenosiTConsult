@@ -36,7 +36,9 @@ export default function AcademyPrivacyPage() {
               Application information may include your name, date of birth,
               country, gender, email, phone number, residential address, optional
               emergency contact details, education history, selected program,
-              and your statement about why you want to study. If admitted, we
+              your statement about why you want to study, and a required passport
+              photo. The photo is used to prepare and display your Academy student
+              identification card. If admitted, we
               also create student account details and maintain learning records
               such as course participation, attendance, assignments, and grades.
             </p>
@@ -67,6 +69,8 @@ export default function AcademyPrivacyPage() {
             <p>
               Access is limited to Academy administrators and staff who need the
               information to review applications or provide Academy services.
+              Passport photos are stored in private file storage and served only
+              to the signed-in student and authorised Academy administrators.
               We use service providers for infrastructure and communications;
               for example, mNotify processes phone numbers and message content
               when an admission SMS is sent. Providers receive only information

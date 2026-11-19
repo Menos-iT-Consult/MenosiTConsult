@@ -153,6 +153,15 @@ test('Academy R2 requires its own bucket and rejects the main-site bucket', asyn
       academyR2.deletePrivatePdf('academy/private/certificates/issued/2026/not-a-pdf.pdf'),
       /Invalid private Academy PDF key/
     );
+    assert.equal(
+      academyR2.isPrivatePhotoKey('academy/private/student-photos/2026/0123456789abcdef0123456789abcdef01234567.jpg'),
+      true
+    );
+    assert.equal(academyR2.isPrivatePhotoKey('academy/media/2026/student.jpg'), false);
+    await assert.rejects(
+      academyR2.getPrivatePhoto('academy/media/2026/student.jpg'),
+      /Invalid private Academy passport photo key/
+    );
 
     process.env.ACADEMY_R2_BUCKET = 'MAIN-MEDIA';
     assert.equal(academyR2.r2Enabled(), false);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 const EMPTY_FILTERS = {
@@ -198,7 +199,11 @@ export default function AcademyStudentsAdminPage() {
                 <article className="ap-card" key={student.id}>
                   <div className="ap-card-heading">
                     <div>
-                      <h3>{[student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ')}</h3>
+                      <h3>
+                        <Link href={`/academy/admin/students/${encodeURIComponent(student.id)}`}>
+                          {[student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ')}
+                        </Link>
+                      </h3>
                       <p className="ap-muted">{student.studentId || 'No Student ID yet'}</p>
                     </div>
                     <span className={`ap-chip ${student.status === 'active' ? 'ap-chip-active' : 'ap-chip-neutral'}`}>

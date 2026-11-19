@@ -81,6 +81,9 @@ export default function AcademyApplicationPage() {
   const [programsError, setProgramsError] = useState('');
   const [programsRetry, setProgramsRetry] = useState(0);
   const [form, setForm] = useState(INITIAL_FORM);
+  const [passportPhoto, setPassportPhoto] = useState(null);
+  const [passportPhotoPreview, setPassportPhotoPreview] = useState('');
+  const passportPhotoPreviewUrl = useRef('');
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -113,6 +116,10 @@ export default function AcademyApplicationPage() {
     return () => controller.abort();
   }, [programsRetry]);
 
+  useEffect(() => () => {
+    if (passportPhotoPreviewUrl.current) URL.revokeObjectURL(passportPhotoPreviewUrl.current);
+  }, []);
+
   const selectedProgram = programs.find((program) => program.id === form.programId);
   const countryCallingCode = getCountryCallingCode(form.nationality);
   const countryRegions = getCountryRegions(form.nationality);
@@ -127,6 +134,33 @@ export default function AcademyApplicationPage() {
       [name]: type === 'checkbox' ? checked : value,
       ...(name === 'nationality' ? { region: '' } : {}),
     }));
+    setError('');
+  }
+
+  function replacePassportPhoto(file) {
+    if (passportPhotoPreviewUrl.current) {
+      URL.revokeObjectURL(passportPhotoPreviewUrl.current);
+    }
+    passportPhotoPreviewUrl.current = file ? URL.createObjectURL(file) : '';
+    setPassportPhoto(file);
+    setPassportPhotoPreview(passportPhotoPreviewUrl.current);
+  }
+
+  function updatePassportPhoto(event) {
+    const file = event.target.files?.[0] || null;
+    if (file && !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      event.target.value = '';
+      replacePassportPhoto(null);
+      setError('Choose a JPEG, PNG, or WebP passport photo.');
+      return;
+    }
+    if (file && file.size > 5 * 1024 * 1024) {
+      event.target.value = '';
+      replacePassportPhoto(null);
+      setError('The passport photo must be 5 MB or smaller.');
+      return;
+    }
+    replacePassportPhoto(file);
     setError('');
   }
 
@@ -157,19 +191,27 @@ export default function AcademyApplicationPage() {
 
   async function submitApplication(event) {
     event.preventDefault();
+    if (!passportPhoto) {
+      setError('A passport photo is required. Add one in Personal details before submitting.');
+      setStep(0);
+      return;
+    }
     if (!formRef.current?.reportValidity()) return;
 
     setSubmitting(true);
     setError('');
     try {
+      const payload = {
+        ...form,
+        phone: normalizePhoneNumber(form.phone, form.nationality) || '',
+        guardianPhone: normalizePhoneNumber(form.guardianPhone, form.nationality) || '',
+      };
+      const formData = new FormData();
+      formData.set('application', JSON.stringify(payload));
+      formData.set('passportPhoto', passportPhoto);
       const response = await fetch('/api/academy/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...form,
-          phone: normalizePhoneNumber(form.phone, form.nationality) || '',
-          guardianPhone: normalizePhoneNumber(form.guardianPhone, form.nationality) || '',
-        }),
+        body: formData,
       });
       const result = await readJsonResponse(response);
       if (!response.ok) {
@@ -181,6 +223,7 @@ export default function AcademyApplicationPage() {
       }
       setApplication(result.application);
       setForm(INITIAL_FORM);
+      replacePassportPhoto(null);
     } catch (submitError) {
       console.error('Academy application submission failed:', submitError);
       setError(submitError.message || 'Could not submit your application.');
@@ -397,6 +440,27 @@ export default function AcademyApplicationPage() {
                         </select>
                       </label>
                     </div>
+                    <label>
+                      Passport photo <span>*</span>
+                      <input
+                        name="passportPhoto"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={updatePassportPhoto}
+                        aria-describedby="passport-photo-hint"
+                        required
+                      />
+                    </label>
+                    <p className="academy-field-hint" id="passport-photo-hint">
+                      Upload a clear JPEG, PNG, or WebP image (5 MB maximum). It will be used for your student ID card.
+                    </p>
+                    {passportPhotoPreview && (
+                      <img
+                        className="academy-passport-photo-preview"
+                        src={passportPhotoPreview}
+                        alt="Passport photo preview"
+                      />
+                    )}
                   </fieldset>
                 )}
 
@@ -673,6 +737,26 @@ export default function AcademyApplicationPage() {
                     <p className="academy-review-intro">
                       Make sure your information is correct. Use the edit buttons to return to any section.
                     </p>
+                    <section className="academy-review-section">
+                      <div className="academy-review-heading">
+                        <h3>Passport photo</h3>
+                        <button className="academy-retry-link" type="button" onClick={() => setStep(0)}>
+                          Edit
+                        </button>
+                      </div>
+                      {passportPhotoPreview ? (
+                        <>
+                          <img
+                            className="academy-passport-photo-preview"
+                            src={passportPhotoPreview}
+                            alt="Passport photo selected for your student ID card"
+                          />
+                          <p>{passportPhoto.name}</p>
+                        </>
+                      ) : (
+                        <p>A passport photo is required.</p>
+                      )}
+                    </section>
                     <div className="academy-review-sections">
                       {reviewSections.map((section) => (
                         <section className="academy-review-section" key={section.title}>

@@ -54,6 +54,19 @@ export default function ProfilePage() {
         </dl>
       </section>
 
+      {data.academicFees && (
+        <section className="ap-card ap-section">
+          <h2>Academic fees</h2>
+          <p className="ap-card-sub">Tuition per semester for {student.programName || 'your program'}.</p>
+          <dl className="ap-defs">
+            <div><dt>Tuition</dt><dd>{data.academicFees.currency} {data.academicFees.fee.toFixed(2)}</dd></div>
+            <div><dt>Scholarship</dt><dd>{data.academicFees.scholarshipName || 'None assigned'}</dd></div>
+            <div><dt>Scholarship discount</dt><dd>{data.academicFees.currency} {data.academicFees.scholarshipDiscount.toFixed(2)}</dd></div>
+            <div><dt>Amount due per semester</dt><dd><strong>{data.academicFees.currency} {data.academicFees.amountDue.toFixed(2)}</strong></dd></div>
+          </dl>
+        </section>
+      )}
+
       <section className="ap-section">
         <div className="ap-card-heading">
           <h2>My enrolled courses</h2>

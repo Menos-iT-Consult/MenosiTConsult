@@ -106,6 +106,9 @@ function mapStudent(r) {
     fieldOfStudy: r.field_of_study || '',
     graduationYear: r.graduation_year || '',
     studyReason: r.study_reason || '',
+    confirmAccuracy: r.confirm_accuracy == null ? null : !!r.confirm_accuracy,
+    termsAccepted: r.terms_accepted == null ? null : !!r.terms_accepted,
+    privacyConsent: r.privacy_consent == null ? null : !!r.privacy_consent,
     seq: r.seq != null ? Number(r.seq) : null,
     createdAt: iso(r.created_at),
     admittedAt: iso(r.admitted_at),
@@ -172,6 +175,22 @@ function mapProgram(r) {
     feeStructure: fees && typeof fees === 'object' ? fees : {},
     published: !!r.published,
     createdAt: iso(r.created_at),
+  };
+}
+
+function mapScholarship(r) {
+  return {
+    id: r.id,
+    name: r.name,
+    description: r.description || '',
+    programId: r.program_id || '',
+    programName: r.program_name || '',
+    discountType: r.discount_type,
+    discountValue: Number(r.discount_value),
+    active: !!r.active,
+    createdBy: r.created_by || '',
+    createdAt: iso(r.created_at),
+    updatedAt: iso(r.updated_at),
   };
 }
 
@@ -402,19 +421,21 @@ async function getStudentCredentials(id) {
 async function createPendingStudent(s) {
   const { rows } = await q(
     `INSERT INTO academy_students
-      (id, first_name, middle_name, last_name, email, phone, program_id, status,
+      (id, first_name, middle_name, last_name, email, phone, photo, program_id, status,
        dob, gender, nationality, address, city, region, country,
        guardian_name, guardian_relationship, guardian_phone,
-       highest_qualification, institution, field_of_study, graduation_year, study_reason)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+       highest_qualification, institution, field_of_study, graduation_year, study_reason,
+       confirm_accuracy, terms_accepted, privacy_consent)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending',$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
      RETURNING *`,
     [
       s.id || newId('astu'), s.firstName, s.middleName || '', s.lastName, s.email,
-      s.phone || '', s.programId || null, s.dob || '', s.gender || '', s.nationality || '',
+      s.phone || '', s.photo || '', s.programId || null, s.dob || '', s.gender || '', s.nationality || '',
       s.address || '', s.city || '', s.region || '', s.country || '',
       s.guardianName || '', s.guardianRelationship || '', s.guardianPhone || '',
       s.highestQualification || '', s.institution || '', s.fieldOfStudy || '',
       s.graduationYear || '', s.studyReason || '',
+      s.confirmAccuracy === true, s.termsAccepted === true, s.privacyConsent === true,
     ]
   );
   return mapStudent(rows[0]);
@@ -744,6 +765,92 @@ async function updateProgram(id, p) {
     ]
   );
   return rows[0] ? mapProgram(rows[0]) : null;
+}
+
+async function listScholarships() {
+  const { rows } = await q(
+    `SELECT scholarship.*, program.name AS program_name
+       FROM academy_scholarships scholarship
+       LEFT JOIN academy_programs program ON program.id = scholarship.program_id
+      ORDER BY scholarship.created_at DESC, scholarship.name`
+  );
+  return rows.map(mapScholarship);
+}
+
+async function getScholarship(id) {
+  const { rows } = await q(
+    `SELECT scholarship.*, program.name AS program_name
+       FROM academy_scholarships scholarship
+       LEFT JOIN academy_programs program ON program.id = scholarship.program_id
+      WHERE scholarship.id = $1`,
+    [id]
+  );
+  return rows[0] ? mapScholarship(rows[0]) : null;
+}
+
+async function createScholarship(scholarship) {
+  const { rows } = await q(
+    `INSERT INTO academy_scholarships
+      (id, name, description, program_id, discount_type, discount_value, active, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+     RETURNING *`,
+    [
+      scholarship.id || newId('asch'),
+      scholarship.name,
+      scholarship.description || '',
+      scholarship.programId || null,
+      scholarship.discountType,
+      scholarship.discountValue,
+      scholarship.active !== false,
+      scholarship.createdBy,
+    ]
+  );
+  return mapScholarship(rows[0]);
+}
+
+async function setScholarshipActive(id, active) {
+  const { rows } = await q(
+    `UPDATE academy_scholarships
+        SET active = $2, updated_at = now()
+      WHERE id = $1
+      RETURNING *`,
+    [id, active]
+  );
+  return rows[0] ? mapScholarship(rows[0]) : null;
+}
+
+async function getStudentScholarship(studentId) {
+  const { rows } = await q(
+    `SELECT scholarship.*, program.name AS program_name, award.assigned_by, award.assigned_at
+       FROM academy_student_scholarships award
+       JOIN academy_scholarships scholarship ON scholarship.id = award.scholarship_id
+       LEFT JOIN academy_programs program ON program.id = scholarship.program_id
+      WHERE award.student_id = $1`,
+    [studentId]
+  );
+  if (!rows[0]) return null;
+  return {
+    ...mapScholarship(rows[0]),
+    assignedBy: rows[0].assigned_by,
+    assignedAt: iso(rows[0].assigned_at),
+  };
+}
+
+async function assignStudentScholarship(studentId, scholarshipId, assignedBy) {
+  if (!scholarshipId) {
+    await q('DELETE FROM academy_student_scholarships WHERE student_id = $1', [studentId]);
+    return null;
+  }
+  await q(
+    `INSERT INTO academy_student_scholarships (student_id, scholarship_id, assigned_by)
+     VALUES ($1,$2,$3)
+     ON CONFLICT (student_id) DO UPDATE
+       SET scholarship_id = EXCLUDED.scholarship_id,
+           assigned_by = EXCLUDED.assigned_by,
+           assigned_at = now()`,
+    [studentId, scholarshipId, assignedBy]
+  );
+  return getStudentScholarship(studentId);
 }
 
 async function deleteProgram(id) {
@@ -2121,30 +2228,6 @@ const DEFAULT_GRADING = {
   ],
 };
 
-const SAMPLE_PROGRAMS = [
-  {
-    code: 'NET',
-    name: 'Network Engineering',
-    description:
-      'Design, build and maintain business networks — structured cabling, routing & switching, wireless and network troubleshooting.',
-    durationSemesters: 4,
-  },
-  {
-    code: 'SEC',
-    name: 'Cybersecurity',
-    description:
-      'Protect organisations against modern threats — security audits, endpoint protection, incident response and safe online practice.',
-    durationSemesters: 4,
-  },
-  {
-    code: 'CLD',
-    name: 'Cloud Computing',
-    description:
-      'Deploy and manage cloud infrastructure — migrations, backups, productivity suites and cost-effective cloud operations.',
-    durationSemesters: 4,
-  },
-];
-
 async function seedAcademy(log = () => {}) {
   // grading scale + weights (configurable in Academy Admin → Settings)
   if (!(await getAcademySetting('grading'))) {
@@ -2183,12 +2266,6 @@ async function seedAcademy(log = () => {}) {
     }
     void bcrypt;
   }
-  // sample published programs so registration works out of the box
-  const programs = await listPrograms();
-  if (programs.length === 0) {
-    for (const p of SAMPLE_PROGRAMS) await createProgram(p);
-    log(`[seed] academy sample programs seeded (${SAMPLE_PROGRAMS.length})`);
-  }
 }
 
 module.exports = {
@@ -2203,8 +2280,10 @@ module.exports = {
   listStaff, getStaff, getStaffByEmail, getStaffAuthByEmail, getStaffCredentials,
   createStaff, updateStaff, updateStaffPassword, deleteStaff,
   createInstructorInvitation, rotateInstructorInvitation, acceptInstructorInvitation,
-  // programs
+  // programs and scholarships
   listPrograms, getProgram, createProgram, updateProgram, deleteProgram,
+  listScholarships, getScholarship, createScholarship, setScholarshipActive,
+  getStudentScholarship, assignStudentScholarship,
   // courses
   createCourse, listCourses, getCourse, setInstructorCourses, isCourseAssignedToInstructor,
   listInstructorRoster,

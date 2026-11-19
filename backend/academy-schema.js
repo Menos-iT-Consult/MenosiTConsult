@@ -60,6 +60,28 @@ async function ensureAcademySchema(query) {
     ADD COLUMN IF NOT EXISTS field_of_study text,
     ADD COLUMN IF NOT EXISTS graduation_year text,
     ADD COLUMN IF NOT EXISTS study_reason text;`);
+  await query(`ALTER TABLE academy_students
+    ADD COLUMN IF NOT EXISTS confirm_accuracy boolean,
+    ADD COLUMN IF NOT EXISTS terms_accepted boolean,
+    ADD COLUMN IF NOT EXISTS privacy_consent boolean;`);
+  await query(`CREATE TABLE IF NOT EXISTS academy_scholarships (
+    id text PRIMARY KEY,
+    name text NOT NULL,
+    description text,
+    program_id text,
+    discount_type text NOT NULL CHECK (discount_type IN ('fixed', 'percentage')),
+    discount_value numeric(12,2) NOT NULL CHECK (discount_value > 0),
+    active boolean NOT NULL DEFAULT true,
+    created_by text,
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now()
+  );`);
+  await query(`CREATE TABLE IF NOT EXISTS academy_student_scholarships (
+    student_id text PRIMARY KEY REFERENCES academy_students(id) ON DELETE CASCADE,
+    scholarship_id text NOT NULL REFERENCES academy_scholarships(id) ON DELETE RESTRICT,
+    assigned_by text NOT NULL,
+    assigned_at timestamptz NOT NULL DEFAULT now()
+  );`);
   await query(`CREATE TABLE IF NOT EXISTS academy_enrollments (
     id text PRIMARY KEY,
     student_id text, course_id text, session_id text,

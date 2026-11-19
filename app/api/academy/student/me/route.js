@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 const academy = require('../../../../../backend/academy-db');
+const storage = require('../../../../../backend/academy-r2');
 const auth = require('../../../../../lib/academy-auth');
 const { noDbErrorResponse } = require('../../../../../lib/api-helpers');
 
@@ -36,7 +37,9 @@ export async function GET(request) {
     lastName: student.lastName,
     email: student.email,
     phone: student.phone,
-    photo: student.photo,
+    photo: storage.isPrivatePhotoKey(student.photo)
+      ? '/api/academy/student/photo'
+      : student.photo,
     dob: student.dob,
     address: student.address,
     guardianName: student.guardianName,

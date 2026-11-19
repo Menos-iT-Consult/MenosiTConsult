@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 const academy = require('../../../../../backend/academy-db');
 const auth = require('../../../../../lib/academy-auth');
+const { calculateSemesterFee } = require('../../../../../lib/academy-finance');
 const { noDbErrorResponse } = require('../../../../../lib/api-helpers');
 
 export async function GET(request) {
@@ -17,6 +18,14 @@ export async function GET(request) {
     }
 
     const portal = await academy.getStudentPortalData(student.id);
+    const [program, scholarship] = await Promise.all([
+      student.programId ? academy.getProgram(student.programId) : null,
+      academy.getStudentScholarship(student.id),
+    ]);
+    const feePerSemester = program?.feeStructure?.feePerSemester;
+    const semesterFee = feePerSemester == null
+      ? null
+      : calculateSemesterFee(feePerSemester, scholarship);
     return NextResponse.json({
       student: {
         id: student.id,
@@ -26,7 +35,14 @@ export async function GET(request) {
         email: student.email,
         mustChangePassword: student.mustChangePassword,
         programId: student.programId,
+        programName: program?.name || '',
       },
+      academicFees: !semesterFee
+        ? null
+        : {
+            ...semesterFee,
+            scholarshipName: scholarship?.name || '',
+          },
       ...portal,
     });
   } catch (err) {

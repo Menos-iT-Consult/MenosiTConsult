@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 function fullName(student) {
@@ -123,6 +124,11 @@ export default function AcademyAdmissionsAdminPage() {
 
                   <details>
                     <summary>View application details</summary>
+                    <p>
+                      <Link className="ap-link" href={`/academy/admin/students/${encodeURIComponent(student.id)}`}>
+                        Open full student record
+                      </Link>
+                    </p>
                     <dl className="ap-defs">
                       <div className="ap-def"><dt>Date of birth</dt><dd>{student.dob || 'Not provided'}</dd></div>
                       <div className="ap-def"><dt>Field of study</dt><dd>{student.fieldOfStudy || 'Not provided'}</dd></div>

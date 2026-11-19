@@ -35,6 +35,7 @@ const PORTALS = {
     links: [
       { href: '/academy/admin/admissions', label: 'Admissions', icon: 'admissions' },
       { href: '/academy/admin/students', label: 'Students', icon: 'students' },
+      { href: '/academy/admin/programs', label: 'Programs & fees', icon: 'courses' },
       { href: '/academy/admin/instructors', label: 'Instructors & courses', icon: 'courses' },
       { href: '/academy/admin/announcements', label: 'Announcements', icon: 'announcements' },
       { href: '/academy/admin/certificates', label: 'Certificates', icon: 'certificate' },

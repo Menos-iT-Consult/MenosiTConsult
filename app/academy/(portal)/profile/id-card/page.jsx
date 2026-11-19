@@ -74,7 +74,7 @@ export default function StudentIdCardPage() {
         </header>
         <div className="ap-id-card-body">
           {student.photo ? (
-            <img className="ap-id-card-photo" src={student.photo} alt={`${fullName} profile`} />
+            <img className="ap-id-card-photo" src={student.photo} alt={`${fullName} passport photo`} />
           ) : (
             <div className="ap-id-card-photo ap-id-card-placeholder" aria-hidden="true">
               {fullName.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()}

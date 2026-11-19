@@ -101,7 +101,7 @@ node server.js    # API only, on PORT (default 3000)
 > The Academy database starts fresh; existing Academy records in the main
 > database are left untouched and are not copied.
 
-## MITA Academy instructor portal
+## MITA Academy portals
 
 Academy administrators sign in at `/academy/admin/login` and manage instructors
 at `/academy/admin/instructors` and review student applications at
@@ -110,6 +110,12 @@ account, issues a Student ID, and sends that ID and its temporary password to
 the applicant by mNotify SMS. The student must change the password at first
 sign-in. Failed SMS deliveries are recorded and can be retried from the
 admissions page without approving the student again.
+Administrators add and publish programs, set each program's tuition per
+semester in GHS, and create fixed-amount or percentage scholarship programs at
+`/academy/admin/programs`. Scholarships are assigned by an administrator on
+each student's details page; one award applies at a time, and discounts are
+capped at the semester fee. Student registration details and recorded consent
+are available from the student directory.
 
 Set `ACADEMY_MNOTIFY_API_KEY` and an mNotify-approved
 `ACADEMY_MNOTIFY_SENDER` before approving applications; missing SMS settings
@@ -175,6 +181,8 @@ affects future issuances only.
 | `/admin/login` | Admin login page |
 | `/academy/admin/login` | MITA Academy administrator login |
 | `/academy/admin/admissions` | Review applications, approve admissions, and retry failed SMS |
+| `/academy/admin/programs` | Add programs, set semester fees, and manage scholarships |
+| `/academy/admin/students` | Student directory with full registration details |
 | `/academy/admin/instructors` | Academy instructor accounts and course assignments |
 | `/instructor/login` | MITA Academy instructor login |
 | `/instructor/dashboard` | Instructor teaching dashboard |

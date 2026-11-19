@@ -799,6 +799,7 @@
 .ap-id-card-brand small { color: #dbeafe; font-size: .75rem; }
 .ap-id-card-body { display: flex; align-items: center; gap: 22px; padding: 24px 22px; }
 .ap-id-card-photo { display: block; width: 112px; height: 132px; flex: none; border: 1px solid #dbe3ec; border-radius: 12px; object-fit: cover; background: #e2e8f0; }
+.ap-admin-student-photo { display: block; width: 160px; max-width: 100%; aspect-ratio: 4 / 5; border: 1px solid #dbe3ec; border-radius: 12px; object-fit: cover; background: #e2e8f0; }
 .ap-id-card-placeholder { display: grid; place-items: center; color: #475569; font-size: 1.5rem; font-weight: 700; }
 .ap-id-card-details { min-width: 0; }
 .ap-id-card-details h2 { margin: 0 0 14px; color: #0f172a; font-size: 1.2rem; }
@@ -814,6 +815,12 @@
 .ap-certificate-upload label { display: grid; min-width: min(100%, 320px); gap: 7px; color: #334155; font-size: .86rem; font-weight: 600; }
 .ap-certificate-upload input { padding: 10px; }
 .ap-certificate-action { flex: none; }
+.ap-program-edit { margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0; }
+.ap-program-edit summary { color: var(--blue); cursor: pointer; font-size: .88rem; font-weight: 650; }
+.ap-program-edit[open] summary { margin-bottom: 14px; }
+.ap-student-statement { overflow-wrap: anywhere; line-height: 1.6; white-space: pre-wrap; }
+.ap-card-heading h3 a { color: inherit; text-decoration: none; }
+.ap-card-heading h3 a:hover { color: var(--blue); text-decoration: underline; }
 
 @media print {
   @page { margin: 0; }
@@ -948,4 +955,5 @@
   .ap-id-card-body { align-items: flex-start; gap: 14px; padding: 18px 16px; }
   .ap-id-card-photo { width: 88px; height: 108px; }
   .ap-id-card-footer { padding: 10px 16px; }
+  .ap-program-edit .ap-form-grid { grid-template-columns: minmax(0, 1fr); }
 }
