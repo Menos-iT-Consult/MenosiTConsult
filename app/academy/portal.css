@@ -781,7 +781,8 @@
   position: relative;
   isolation: isolate;
   display: flex;
-  width: min(100%, 700px);
+  width: min(100%, 760px);
+  margin: 0 auto;
   aspect-ratio: 1.586;
   flex-direction: column;
   justify-content: space-between;
@@ -819,7 +820,22 @@
 .ap-id-card-qr svg { display: block; width: 100%; height: auto; }
 .ap-id-card-qr small { color: #29263f; font-size: .53rem; font-weight: 800; letter-spacing: .06em; }
 .ap-id-card-qr-empty { display: grid; width: 100%; aspect-ratio: 1; place-items: center; color: #64748b; font-size: .6rem; }
-.ap-id-card-footer { padding: 0 26px 12px; color: #343148; font-size: .6rem; font-weight: 750; letter-spacing: .08em; }
+.ap-id-card-footer {
+  align-self: center;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  margin: 0 0 10px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .92);
+  color: #29263f;
+  font-size: .58rem;
+  font-weight: 750;
+  letter-spacing: .06em;
+  line-height: 1.3;
+  text-align: center;
+}
+.ap-id-card-heading { width: min(100%, 760px); margin: 0 auto 24px; align-items: flex-end; }
 .ap-id-card-verification-error { margin-top: 14px; }
 .ap-id-verification { display: grid; min-height: 100vh; place-items: center; padding: 24px; background: #f8fafc; }
 .ap-id-verification-card { display: grid; width: min(100%, 480px); justify-items: start; gap: 14px; padding: 32px; border: 1px solid #e2e8f0; border-radius: 20px; background: #fff; box-shadow: 0 16px 42px rgba(15, 23, 42, .08); }
@@ -858,6 +874,7 @@
     left: 0;
     width: 85.6mm;
     height: 54mm;
+    margin: 0;
     aspect-ratio: auto;
     border-radius: 3mm;
     box-shadow: none;
@@ -983,12 +1000,14 @@
   .ap-attendance-row { grid-template-columns: 1fr; }
   .ap-instructor-course { align-items: flex-start; }
   .ap-instructor-course small { margin-left: 0; }
-  .ap-id-card-heading { align-items: flex-start; flex-direction: column; }
+  .ap-id-card-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
   .ap-program-edit .ap-form-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media screen and (max-width: 640px) {
   .ap-id-card { min-height: 350px; aspect-ratio: auto; }
+  .ap-id-card-heading { margin-bottom: 20px; }
+  .ap-id-card-heading .ap-button { width: 100%; justify-content: center; }
   .ap-id-card-brand { display: grid; min-height: 110px; grid-template-columns: minmax(0, 1fr); grid-template-areas: "logo" "title"; justify-content: initial; justify-items: center; gap: 5px; padding: 10px 16px 0; }
   .ap-id-card-logo { grid-area: logo; width: 84px; max-height: 56px; }
   .ap-id-card-brand h2 { grid-area: title; margin: 0; text-align: center; }
@@ -1003,5 +1022,12 @@
   .ap-id-card-qr svg,
   .ap-id-card-qr-empty { width: 60px; }
   .ap-id-card-qr small { font-size: .53rem; }
-  .ap-id-card-footer { padding: 0 16px 14px; font-size: .5rem; text-align: center; }
+  .ap-id-card-footer { margin-bottom: 10px; padding: 5px 8px; font-size: .48rem; }
+}
+
+@media screen and (max-width: 380px) {
+  .ap-main { padding-right: 14px; padding-left: 14px; }
+  .ap-id-card-body { grid-template-columns: 72px minmax(0, 1fr); gap: 10px; padding-right: 12px; padding-left: 12px; }
+  .ap-id-card-photo { width: 68px; }
+  .ap-id-card-details dl { grid-template-columns: minmax(0, 1fr); }
 }
