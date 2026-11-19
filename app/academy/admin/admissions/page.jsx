@@ -109,6 +109,7 @@ export default function AcademyAdmissionsAdminPage() {
             <p>Review applications and approve students. Approval activates portal access and sends the Student ID by SMS.</p>
           </div>
           <div className="ap-actions">
+            <Link className="ap-button" href="/academy/admin/students">Students</Link>
             <Link className="ap-button" href="/academy/admin/instructors">Instructor accounts</Link>
             <Link className="ap-button" href="/academy/admin/announcements">Announcements</Link>
             <button className="ap-button" onClick={signOut}>Sign out</button>

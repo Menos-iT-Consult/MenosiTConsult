@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 const academy = require('../../../../backend/academy-db');
 const auth = require('../../../../lib/academy-auth');
 const staffAuth = require('../../../../lib/academy-staff');
+const { validateStudentSubmission } = require('../../../../lib/academy-submissions');
 const { noDbErrorResponse } = require('../../../../lib/api-helpers');
 
 async function activeStudent(request) {
@@ -53,20 +54,32 @@ export async function POST(request) {
     const assignmentId = String(body.assignmentId || '');
     const text = String(body.text || '').trim();
     const file = String(body.file || '').trim();
-    if (!assignmentId || text.length > 20000 || file.length > 2000000) {
+    if (!assignmentId) {
       return NextResponse.json({ error: 'Provide an assignment and valid submission content.' }, { status: 400 });
     }
-    const submission = await academy.createStudentSubmission(student.id, { assignmentId, text, file });
-    if (!submission) {
-      return NextResponse.json({ error: 'Assignment not found or you are not enrolled in its course session.' }, { status: 404 });
+    const validationError = validateStudentSubmission(text, file);
+    if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
+
+    const result = await academy.saveStudentSubmission(student.id, { assignmentId, text, file });
+    if (result.error === 'not_enrolled') {
+      return NextResponse.json(
+        { error: 'Assignment not found or you are not enrolled in its course session.' },
+        { status: 404 }
+      );
     }
-    return NextResponse.json(submission, { status: 201 });
+    if (result.error === 'deadline_passed') {
+      return NextResponse.json({ error: 'The assignment deadline has passed.' }, { status: 409 });
+    }
+    if (result.error === 'already_graded') {
+      return NextResponse.json({ error: 'This submission has been graded and can no longer be changed.' }, { status: 409 });
+    }
+    if (result.error || !result.submission) {
+      return NextResponse.json({ error: 'This assignment can no longer accept submissions.' }, { status: 409 });
+    }
+    return NextResponse.json(result.submission, { status: result.created ? 201 : 200 });
   } catch (err) {
     const noDb = noDbErrorResponse(err);
     if (noDb) return noDb;
-    if (err.code === '23505') {
-      return NextResponse.json({ error: 'A submission already exists for this assignment.' }, { status: 409 });
-    }
     console.error('Academy submission create error:', err);
     return NextResponse.json({ error: 'Could not create submission.' }, { status: 500 });
   }

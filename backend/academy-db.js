@@ -204,6 +204,86 @@ async function listStudents({ status } = {}) {
   return rows.map(mapStudent);
 }
 
+async function listAdminStudents({
+  status,
+  programId,
+  sessionId,
+  smsStatus,
+  search,
+  limit = 50,
+  offset = 0,
+} = {}) {
+  const { rows } = await q(
+    `SELECT st.id, st.student_id, st.first_name, st.middle_name, st.last_name,
+            st.email, st.phone, st.program_id, st.status, st.admitted_at, st.created_at,
+            p.name AS program_name,
+            COALESCE(latest.status, 'not_sent') AS sms_status,
+            latest.error AS sms_error,
+            latest.created_at AS sms_at,
+            COALESCE(session_names.names, ARRAY[]::text[]) AS session_names,
+            COUNT(*) OVER() AS total_count
+       FROM academy_students st
+       LEFT JOIN academy_programs p ON p.id = st.program_id
+       LEFT JOIN LATERAL (
+         SELECT n.status, n.error, n.created_at
+           FROM academy_notifications n
+          WHERE n.student_id = st.id
+            AND n.channel = 'sms'
+            AND n.type = 'admission_approved'
+          ORDER BY n.created_at DESC
+          LIMIT 1
+       ) latest ON true
+       LEFT JOIN LATERAL (
+         SELECT array_agg(DISTINCT s.name ORDER BY s.name) AS names
+           FROM academy_enrollments e
+           JOIN academy_sessions s ON s.id = e.session_id
+          WHERE e.student_id = st.id
+       ) session_names ON true
+      WHERE ($1::text IS NULL OR st.status = $1)
+        AND ($2::text IS NULL OR st.program_id = $2)
+        AND ($3::text IS NULL OR EXISTS (
+          SELECT 1 FROM academy_enrollments e
+           WHERE e.student_id = st.id AND e.session_id = $3
+        ))
+        AND ($4::text IS NULL OR COALESCE(latest.status, 'not_sent') = $4)
+        AND ($5::text IS NULL OR concat_ws(
+          ' ', st.student_id, st.first_name, st.middle_name, st.last_name, st.email, st.phone
+        ) ILIKE $5)
+      ORDER BY st.created_at DESC, st.id
+      LIMIT $6 OFFSET $7`,
+    [
+      status || null,
+      programId || null,
+      sessionId || null,
+      smsStatus || null,
+      search ? `%${search}%` : null,
+      limit,
+      offset,
+    ]
+  );
+  return {
+    students: rows.map((row) => ({
+      id: row.id,
+      studentId: row.student_id || '',
+      firstName: row.first_name || '',
+      middleName: row.middle_name || '',
+      lastName: row.last_name || '',
+      email: row.email || '',
+      phone: row.phone || '',
+      programId: row.program_id || '',
+      programName: row.program_name || 'Program unavailable',
+      status: row.status,
+      admittedAt: iso(row.admitted_at),
+      createdAt: iso(row.created_at),
+      sessionNames: row.session_names || [],
+      smsStatus: row.sms_status || 'not_sent',
+      smsError: row.sms_error || '',
+      smsAt: iso(row.sms_at),
+    })),
+    total: rows[0] ? Number(rows[0].total_count) : 0,
+  };
+}
+
 async function getStudent(id) {
   const { rows } = await q('SELECT * FROM academy_students WHERE id = $1', [id]);
   return rows[0] ? mapStudent(rows[0]) : null;
@@ -784,7 +864,8 @@ async function getStudentPortalData(studentId) {
       q(
         `SELECT a.id, a.course_id, a.session_id, a.title, a.instructions, a.due_at,
                 a.max_score, a.attachment, c.title AS course_title, s.name AS session_name,
-                sub.id AS submission_id, sub.submitted_at, sub.score, sub.feedback
+                sub.id AS submission_id, sub.submitted_at, sub.score, sub.feedback,
+                sub.text AS submission_text, sub.file AS submission_file
            FROM academy_assignments a
            JOIN academy_enrollments e
              ON e.student_id = $1 AND e.status IN ('enrolled', 'active')
@@ -1086,23 +1167,60 @@ async function createSubmission(s) {
   return mapSubmission(rows[0]);
 }
 
-async function createStudentSubmission(studentId, submission) {
-  const { rows } = await q(
-    `INSERT INTO academy_submissions
-      (id, assignment_id, student_id, text, file)
-     SELECT $1, a.id, e.student_id, $4, $5
-       FROM academy_assignments a
-       JOIN academy_enrollments e
-         ON e.student_id = $2 AND e.course_id = a.course_id
-        AND e.session_id = a.session_id AND e.status IN ('enrolled', 'active')
-      WHERE a.id = $3
-     RETURNING *`,
-    [
-      newId('acms'), studentId, submission.assignmentId,
-      submission.text || null, submission.file || null,
-    ]
-  );
-  return rows[0] ? mapSubmission(rows[0]) : null;
+async function saveStudentSubmission(studentId, submission) {
+  return transaction(async (client) => {
+    const { rows: eligibleRows } = await client.query(
+      `SELECT a.id, a.due_at, (a.due_at IS NOT NULL AND a.due_at < now()) AS deadline_passed
+         FROM academy_assignments a
+         JOIN academy_enrollments e
+           ON e.student_id = $1 AND e.course_id = a.course_id
+          AND e.session_id = a.session_id AND e.status IN ('enrolled', 'active')
+        WHERE a.id = $2
+        FOR UPDATE OF a, e`,
+      [studentId, submission.assignmentId]
+    );
+    if (!eligibleRows[0]) return { error: 'not_enrolled' };
+    if (eligibleRows[0].deadline_passed) return { error: 'deadline_passed' };
+
+    const { rows: existingRows } = await client.query(
+      `SELECT id, score
+         FROM academy_submissions
+        WHERE assignment_id = $1 AND student_id = $2
+        FOR UPDATE`,
+      [submission.assignmentId, studentId]
+    );
+    if (existingRows[0] && existingRows[0].score != null) {
+      return { error: 'already_graded' };
+    }
+
+    const values = [
+      newId('acms'),
+      submission.assignmentId,
+      studentId,
+      submission.text || null,
+      submission.file || null,
+    ];
+    const { rows } = await client.query(
+      `INSERT INTO academy_submissions AS existing_submission
+        (id, assignment_id, student_id, text, file)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (assignment_id, student_id)
+       DO UPDATE SET text = EXCLUDED.text, file = EXCLUDED.file, submitted_at = now()
+       WHERE existing_submission.score IS NULL
+         AND EXISTS (
+           SELECT 1 FROM academy_assignments a
+            WHERE a.id = EXCLUDED.assignment_id
+              AND (a.due_at IS NULL OR a.due_at >= now())
+         )
+       RETURNING *`,
+      values
+    );
+    if (!rows[0]) return { error: 'submission_closed' };
+    return {
+      submission: mapSubmission(rows[0]),
+      created: !existingRows[0],
+    };
+  });
 }
 
 async function updateSubmission(id, s) {
@@ -1315,6 +1433,113 @@ async function upsertInstructorGrade(staffId, { enrollmentId, ca, exam }) {
     [enrollmentId, staffId, ca, exam]
   );
   return rows[0] ? mapGrade(rows[0]) : null;
+}
+
+async function listInstructorCourseProgress(staffId) {
+  const { rows } = await q(
+    `WITH roster AS (
+       SELECT course_id, COUNT(DISTINCT student_id) AS roster_count
+         FROM academy_enrollments
+        WHERE status IN ('enrolled', 'active')
+        GROUP BY course_id
+     ),
+     expected_work AS (
+       SELECT a.course_id, e.student_id, sub.id AS submission_id, sub.score
+         FROM academy_assignments a
+         JOIN academy_enrollments e
+           ON e.course_id = a.course_id AND e.session_id = a.session_id
+          AND e.status IN ('enrolled', 'active')
+         LEFT JOIN academy_submissions sub
+           ON sub.assignment_id = a.id AND sub.student_id = e.student_id
+     ),
+     work_summary AS (
+       SELECT course_id,
+              COUNT(*) FILTER (WHERE submission_id IS NULL) AS missing_submission_count,
+              COUNT(DISTINCT student_id) FILTER (WHERE submission_id IS NULL) AS missing_student_count,
+              COUNT(*) FILTER (WHERE submission_id IS NOT NULL AND score IS NULL) AS ungraded_submission_count,
+              COUNT(submission_id) AS submitted_count
+         FROM expected_work
+        GROUP BY course_id
+     ),
+     attendance_summary AS (
+       SELECT course_id,
+              COUNT(*) AS attendance_record_count,
+              COUNT(*) FILTER (WHERE status = 'present') AS present_count,
+              COUNT(*) FILTER (WHERE status = 'late') AS late_count,
+              COUNT(*) FILTER (WHERE status = 'absent') AS absent_count,
+              COUNT(*) FILTER (WHERE status = 'excused') AS excused_count
+         FROM academy_attendance
+        GROUP BY course_id
+     )
+     SELECT c.id, c.code, c.title,
+            COALESCE(r.roster_count, 0) AS roster_count,
+            COALESCE(w.missing_submission_count, 0) AS missing_submission_count,
+            COALESCE(w.missing_student_count, 0) AS missing_student_count,
+            COALESCE(w.ungraded_submission_count, 0) AS ungraded_submission_count,
+            COALESCE(w.submitted_count, 0) AS submitted_count,
+            COALESCE(a.attendance_record_count, 0) AS attendance_record_count,
+            COALESCE(a.present_count, 0) AS present_count,
+            COALESCE(a.late_count, 0) AS late_count,
+            COALESCE(a.absent_count, 0) AS absent_count,
+            COALESCE(a.excused_count, 0) AS excused_count
+       FROM academy_courses c
+       LEFT JOIN roster r ON r.course_id = c.id
+       LEFT JOIN work_summary w ON w.course_id = c.id
+       LEFT JOIN attendance_summary a ON a.course_id = c.id
+      WHERE c.instructor_staff_id = $1
+      ORDER BY c.title ASC`,
+    [staffId]
+  );
+  return rows.map((row) => ({
+    courseId: row.id,
+    courseCode: row.code || '',
+    courseTitle: row.title || '',
+    rosterCount: Number(row.roster_count),
+    missingSubmissionCount: Number(row.missing_submission_count),
+    missingStudentCount: Number(row.missing_student_count),
+    ungradedSubmissionCount: Number(row.ungraded_submission_count),
+    submittedCount: Number(row.submitted_count),
+    attendanceRecordCount: Number(row.attendance_record_count),
+    presentCount: Number(row.present_count),
+    lateCount: Number(row.late_count),
+    absentCount: Number(row.absent_count),
+    excusedCount: Number(row.excused_count),
+  }));
+}
+
+async function listStudentAttendance(studentId, { courseId, sessionId } = {}) {
+  const params = [studentId];
+  const filters = [];
+  if (courseId) {
+    params.push(courseId);
+    filters.push(`a.course_id = $${params.length}`);
+  }
+  if (sessionId) {
+    params.push(sessionId);
+    filters.push(`a.session_id = $${params.length}`);
+  }
+  const { rows } = await q(
+    `SELECT a.id, a.course_id, a.session_id, a.meeting_date, a.status, a.note,
+            c.code AS course_code, c.title AS course_title, s.name AS session_name
+       FROM academy_attendance a
+       JOIN academy_courses c ON c.id = a.course_id
+       JOIN academy_sessions s ON s.id = a.session_id
+      WHERE a.student_id = $1
+        ${filters.map((filter) => `AND ${filter}`).join('\n        ')}
+      ORDER BY a.meeting_date DESC, c.title ASC`,
+    params
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    courseId: row.course_id,
+    courseCode: row.course_code || '',
+    courseTitle: row.course_title || '',
+    sessionId: row.session_id,
+    sessionName: row.session_name || '',
+    meetingDate: dateOnly(row.meeting_date),
+    status: row.status,
+    note: row.note || '',
+  }));
 }
 
 async function listInstructorAttendance(staffId, { courseId, sessionId, meetingDate } = {}) {
@@ -1908,7 +2133,7 @@ module.exports = {
   ensureAcademyReady,
   newId,
   // students
-  listStudents, getStudent, getStudentByStudentId, getStudentByEmail,
+  listStudents, listAdminStudents, getStudent, getStudentByStudentId, getStudentByEmail,
   getStudentAuthByStudentId, getStudentCredentials, createPendingStudent, updateStudent, setStudentStatus,
   admitStudent, updateStudentPassword, nextSeq, deleteStudent,
   // staff
@@ -1931,12 +2156,13 @@ module.exports = {
   deleteInstructorAssignment,
   // submissions
   listSubmissions, getSubmission, createSubmission, updateSubmission, deleteSubmission,
-  createStudentSubmission, listInstructorSubmissions, updateInstructorSubmission,
+  saveStudentSubmission, listInstructorSubmissions, updateInstructorSubmission,
   getInstructorSubmissionMaxScore,
   // grades
   calculateGrade, upsertGrade, getGrade, listInstructorGradebook, upsertInstructorGrade,
+  listInstructorCourseProgress,
   // instructor attendance and lesson plans
-  listInstructorAttendance, saveInstructorAttendance,
+  listStudentAttendance, listInstructorAttendance, saveInstructorAttendance,
   listInstructorLessonPlans, createInstructorLessonPlan,
   updateInstructorLessonPlan, deleteInstructorLessonPlan,
   // timetable

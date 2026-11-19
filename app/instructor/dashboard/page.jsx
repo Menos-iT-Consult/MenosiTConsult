@@ -10,6 +10,7 @@ export default function InstructorDashboard() {
   const [courses, setCourses] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [submissions, setSubmissions] = useState([]);
+  const [progress, setProgress] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -33,6 +34,7 @@ export default function InstructorDashboard() {
         fetch('/api/academy/instructor/courses', { credentials: 'include' }),
         fetch('/api/academy/instructor/assignments', { credentials: 'include' }),
         fetch('/api/academy/instructor/submissions', { credentials: 'include' }),
+        fetch('/api/academy/instructor/progress', { credentials: 'include' }),
       ]);
       const results = await Promise.all(responses.map((response) => response.json()));
       const failed = responses.findIndex((response) => !response.ok);
@@ -40,6 +42,7 @@ export default function InstructorDashboard() {
       setCourses(results[0]);
       setAssignments(results[1]);
       setSubmissions(results[2]);
+      setProgress(results[3]);
     } catch (loadError) {
       setError(loadError.message || 'Could not load your instructor workspace.');
     } finally {
@@ -97,6 +100,36 @@ export default function InstructorDashboard() {
                 <span>Submissions to review</span>
                 <strong>{submissions.filter((submission) => submission.score == null).length}</strong>
               </article>
+            </section>
+
+            <section className="ap-section">
+              <h2>Course progress</h2>
+              {progress.length ? (
+                <div className="ap-course-grid">
+                  {progress.map((course) => (
+                    <article className="ap-card" key={course.courseId}>
+                      <p className="ap-eyebrow">{course.courseCode || 'Course'}</p>
+                      <h3>{course.courseTitle}</h3>
+                      <p>{course.rosterCount} enrolled students</p>
+                      <p>
+                        Attendance recorded: {course.attendanceRecordCount}
+                        {' · '}Present {course.presentCount}
+                        {' · '}Late {course.lateCount}
+                        {' · '}Absent {course.absentCount}
+                      </p>
+                      <p>
+                        {course.missingSubmissionCount} missing submissions across {course.missingStudentCount} students
+                      </p>
+                      <p>{course.ungradedSubmissionCount} submissions awaiting review</p>
+                      <Link className="ap-link" href={`/instructor/courses/${encodeURIComponent(course.courseId)}`}>
+                        Open course workspace
+                      </Link>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="ap-card ap-empty"><p>No course progress is available yet.</p></div>
+              )}
             </section>
 
             <section className="ap-section">

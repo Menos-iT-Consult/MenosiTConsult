@@ -3,9 +3,13 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '../api';
 import { toast, fmtDate, fmtDateTime } from '../ui';
+import { downloadCsv } from '../../../lib/csv-export';
 
 export default function MessagesView({ messages, setMessages, setUnread, onOpenMessage, refreshSignal }) {
   const [status, setStatus] = useState('loading');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [readFilter, setReadFilter] = useState('');
 
   useEffect(() => {
     load();
@@ -53,12 +57,54 @@ export default function MessagesView({ messages, setMessages, setUnread, onOpenM
     }
   }
 
-  const rows = messages;
+  const rows = messages.filter((message) => {
+    const date = String(message.createdAt || '').slice(0, 10);
+    if (startDate && (!date || date < startDate)) return false;
+    if (endDate && (!date || date > endDate)) return false;
+    if (readFilter === 'read' && !message.read) return false;
+    if (readFilter === 'unread' && message.read) return false;
+    return true;
+  });
 
   return (
     <section id="section-messages" className="section">
       <div className="section-header">
         <h3>Messages</h3>
+        <div className="header-actions">
+          <label>
+            From
+            <input aria-label="Messages from date" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+          </label>
+          <label>
+            To
+            <input aria-label="Messages to date" type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+          </label>
+          <label>
+            Status
+            <select aria-label="Message read status" value={readFilter} onChange={(event) => setReadFilter(event.target.value)}>
+              <option value="">All</option>
+              <option value="unread">Unread</option>
+              <option value="read">Read</option>
+            </select>
+          </label>
+          <button
+            className="btn btn-secondary"
+            type="button"
+            disabled={!rows.length}
+            onClick={() => downloadCsv('contact-messages.csv', rows, [
+              { key: 'name', label: 'Name' },
+              { key: 'email', label: 'Email' },
+              { key: 'phone', label: 'Phone' },
+              { key: 'service', label: 'Service' },
+              { key: 'source', label: 'Source' },
+              { key: 'message', label: 'Message' },
+              { key: 'createdAt', label: 'Received at' },
+              { key: 'read', label: 'Read' },
+            ])}
+          >
+            Export CSV
+          </button>
+        </div>
       </div>
       <div className="table-wrap">
         <table className="data-table">
@@ -88,7 +134,7 @@ export default function MessagesView({ messages, setMessages, setUnread, onOpenM
             ) : rows.length === 0 ? (
               <tr>
                 <td colSpan="6" className="empty-row">
-                  No messages yet.
+                  {messages.length ? 'No messages match these filters.' : 'No messages yet.'}
                 </td>
               </tr>
             ) : (

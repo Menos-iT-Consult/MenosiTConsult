@@ -92,6 +92,7 @@ export default function AcademyAnnouncementsAdminPage() {
         </div>
         <div className="ap-actions">
           <Link className="ap-button" href="/academy/admin/admissions">Admissions</Link>
+          <Link className="ap-button" href="/academy/admin/students">Students</Link>
           <Link className="ap-button" href="/academy/admin/instructors">Instructor accounts</Link>
           <button className="ap-button" onClick={signOut}>Sign out</button>
         </div>

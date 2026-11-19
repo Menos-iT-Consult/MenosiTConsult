@@ -3,11 +3,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { apiFetch } from '../api';
 import { toast, fmtDate } from '../ui';
+import { downloadCsv } from '../../../lib/csv-export';
 
 export default function NewsletterView({ refreshSignal }) {
   const [subs, setSubs] = useState(null);
   const [loadError, setLoadError] = useState(false);
   const [tipOpen, setTipOpen] = useState(false);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
     load();
@@ -57,6 +60,12 @@ export default function NewsletterView({ refreshSignal }) {
   const sorted = subs
     ? subs.slice().sort((a, b) => new Date(b.subscribedAt) - new Date(a.subscribedAt))
     : [];
+  const filtered = sorted.filter((subscriber) => {
+    const date = String(subscriber.subscribedAt || '').slice(0, 10);
+    if (startDate && (!date || date < startDate)) return false;
+    if (endDate && (!date || date > endDate)) return false;
+    return true;
+  });
 
   return (
     <section id="section-newsletter" className="section">
@@ -66,6 +75,33 @@ export default function NewsletterView({ refreshSignal }) {
           <span id="subscriber-count" className="count-badge">
             {subs ? `${count} subscriber${count !== 1 ? 's' : ''}` : ''}
           </span>
+          <label>
+            From
+            <input aria-label="Subscribers from date" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+          </label>
+          <label>
+            To
+            <input aria-label="Subscribers to date" type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+          </label>
+          <button
+            className="btn btn-secondary"
+            type="button"
+            disabled={loadError || !filtered.length}
+            onClick={() => downloadCsv(
+              'newsletter-subscribers.csv',
+              filtered.map((subscriber) => ({
+                ...subscriber,
+                name: [subscriber.firstName, subscriber.lastName].filter(Boolean).join(' ').trim(),
+              })),
+              [
+                { key: 'name', label: 'Name' },
+                { key: 'email', label: 'Email' },
+                { key: 'subscribedAt', label: 'Subscribed at' },
+              ]
+            )}
+          >
+            Export CSV
+          </button>
           <button className="btn btn-primary" id="send-tip-btn" onClick={() => setTipOpen(true)}>
             Send Email Tip
           </button>
@@ -94,14 +130,14 @@ export default function NewsletterView({ refreshSignal }) {
                   Error loading subscribers.
                 </td>
               </tr>
-            ) : sorted.length === 0 ? (
+            ) : filtered.length === 0 ? (
               <tr>
                 <td colSpan="4" className="empty-row">
-                  No subscribers yet.
+                  {subs.length ? 'No subscribers match these date filters.' : 'No subscribers yet.'}
                 </td>
               </tr>
             ) : (
-              sorted.map((s) => (
+              filtered.map((s) => (
                 <tr key={s.email}>
                   <td>{[s.firstName, s.lastName].filter(Boolean).join(' ').trim() || '—'}</td>
                   <td>{s.email}</td>

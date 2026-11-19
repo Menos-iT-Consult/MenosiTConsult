@@ -154,6 +154,8 @@ async function ensureAcademySchema(query) {
     updated_at timestamptz DEFAULT now(),
     UNIQUE (course_id, session_id, student_id, meeting_date)
   );`);
+  await query(`CREATE INDEX IF NOT EXISTS academy_attendance_student_date
+    ON academy_attendance (student_id, meeting_date DESC);`);
   await query(`CREATE TABLE IF NOT EXISTS academy_lesson_plans (
     id text PRIMARY KEY,
     course_id text NOT NULL,

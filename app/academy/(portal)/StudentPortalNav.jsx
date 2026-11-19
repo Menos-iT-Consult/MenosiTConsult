@@ -8,6 +8,7 @@ const links = [
   { href: '/academy/dashboard', label: 'Dashboard' },
   { href: '/academy/courses', label: 'Courses' },
   { href: '/academy/assignments', label: 'Assignments & exams' },
+  { href: '/academy/attendance', label: 'Attendance' },
   { href: '/academy/timetable', label: 'Timetable' },
   { href: '/academy/profile', label: 'Profile' },
 ];
