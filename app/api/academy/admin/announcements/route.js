@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 
 const academy = require('../../../../../backend/academy-db');
 const auth = require('../../../../../lib/academy-auth');
+const {
+  sendStudentNotifications,
+  summarizeStudentNotifications,
+} = require('../../../../../lib/academy-notifications');
 const { noDbErrorResponse } = require('../../../../../lib/api-helpers');
 
 async function getAdministrator(request) {
@@ -84,7 +88,23 @@ export async function POST(request) {
       createdBy: administrator.staff.id,
       published: true,
     });
-    return NextResponse.json(announcement, { status: 201 });
+    const [students, sessions] = await Promise.all([
+      sessionId
+        ? academy.listStudentsForSession(sessionId)
+        : academy.listStudents({ status: 'active' }),
+      academy.listSessions(),
+    ]);
+    const sessionName = sessions.find((session) => session.id === sessionId)?.name || 'all students';
+    const deliveries = await sendStudentNotifications(students, {
+      type: 'academy_announcement',
+      subject: `MITA Academy announcement: ${title}`,
+      emailMessage: `MITA Academy announcement for ${sessionName}:\n\n${title}\n\n${message}\n\nSign in to the portal to view your Academy updates.`,
+      smsMessage: `MITA Academy announcement for ${sessionName}: ${title}. Sign in to the portal for details.`,
+    });
+    return NextResponse.json({
+      ...announcement,
+      notifications: summarizeStudentNotifications(deliveries),
+    }, { status: 201 });
   } catch (err) {
     const noDb = noDbErrorResponse(err);
     if (noDb) return noDb;

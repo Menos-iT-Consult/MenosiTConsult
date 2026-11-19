@@ -46,7 +46,7 @@ export default function AcademyAdmissionsAdminPage() {
   useEffect(() => { loadApplications(); }, [loadApplications]);
 
   async function approveAdmission(student) {
-    if (!window.confirm(`Approve ${fullName(student)} and send the admission details by SMS?`)) return;
+    if (!window.confirm(`Approve ${fullName(student)} and send the admission details by email and SMS?`)) return;
     setSaving(student.id);
     setError('');
     setNotice('');
@@ -58,7 +58,7 @@ export default function AcademyAdmissionsAdminPage() {
       const result = await response.json();
       await loadApplications();
       if (!response.ok) throw new Error(result.error || 'Could not approve this admission.');
-      setNotice(`${fullName(student)} was admitted and the SMS was sent.`);
+      setNotice(`${fullName(student)} was admitted and email and SMS notifications were sent.`);
     } catch (saveError) {
       setError(saveError.message || 'Could not approve this admission.');
     } finally {
@@ -66,7 +66,7 @@ export default function AcademyAdmissionsAdminPage() {
     }
   }
 
-  async function retryAdmissionSms(student) {
+  async function retryAdmissionNotifications(student) {
     setSaving(student.id);
     setError('');
     setNotice('');
@@ -77,10 +77,34 @@ export default function AcademyAdmissionsAdminPage() {
       );
       const result = await response.json();
       await loadApplications();
-      if (!response.ok) throw new Error(result.error || 'Could not retry the admission SMS.');
-      setNotice(`Admission SMS sent to ${student.phone}.`);
+      if (!response.ok) throw new Error(result.error || 'Could not retry the admission notifications.');
+      setNotice(`Admission email and SMS notifications were sent to ${fullName(student)}.`);
     } catch (retryError) {
-      setError(retryError.message || 'Could not retry the admission SMS.');
+      setError(retryError.message || 'Could not retry the admission notifications.');
+    } finally {
+      setSaving('');
+    }
+  }
+
+  async function declineAdmission(student) {
+    if (!window.confirm(`Decline ${fullName(student)}'s admission application and notify them by email and SMS?`)) return;
+    setSaving(student.id);
+    setError('');
+    setNotice('');
+    try {
+      const response = await fetch(
+        `/api/academy/admin/students/${encodeURIComponent(student.id)}/reject`,
+        { method: 'POST', credentials: 'include' }
+      );
+      const result = await response.json();
+      await loadApplications();
+      if (!response.ok) throw new Error(result.error || 'Could not decline this application.');
+      const delivered = result.notifications?.email.sent && result.notifications?.sms.sent;
+      setNotice(delivered
+        ? `${fullName(student)}'s application was declined and email and SMS notifications were sent.`
+        : `${fullName(student)}'s application was declined, but one or more notifications could not be sent.`);
+    } catch (saveError) {
+      setError(saveError.message || 'Could not decline this application.');
     } finally {
       setSaving('');
     }
@@ -91,7 +115,7 @@ export default function AcademyAdmissionsAdminPage() {
         <header className="ap-page-head ap-admin-heading">
           <div>
             <h1>Admission applications</h1>
-            <p>Review applications and approve students. Approval activates portal access and sends the Student ID by SMS.</p>
+            <p>Review applications and approve students. Approval activates portal access and sends the Student ID by email and SMS.</p>
           </div>
         </header>
 
@@ -140,14 +164,24 @@ export default function AcademyAdmissionsAdminPage() {
                     <p>{student.studyReason || 'Not provided'}</p>
                   </details>
 
-                  <button
-                    className="ap-button ap-button-primary"
-                    type="button"
-                    onClick={() => approveAdmission(student)}
-                    disabled={saving === student.id}
-                  >
-                    {saving === student.id ? 'Approving…' : 'Approve admission and send SMS'}
-                  </button>
+                  <div className="ap-form-grid">
+                    <button
+                      className="ap-button ap-button-primary"
+                      type="button"
+                      onClick={() => approveAdmission(student)}
+                      disabled={saving === student.id}
+                    >
+                      {saving === student.id ? 'Approving…' : 'Approve admission and notify'}
+                    </button>
+                    <button
+                      className="ap-button ap-button-danger"
+                      type="button"
+                      onClick={() => declineAdmission(student)}
+                      disabled={saving === student.id}
+                    >
+                      Decline and notify
+                    </button>
+                  </div>
                 </article>
               ))}
             </div>
@@ -157,8 +191,8 @@ export default function AcademyAdmissionsAdminPage() {
         </section>
 
         <section className="ap-section">
-          <h2>Admission SMS failures</h2>
-          <p className="ap-muted">These students are already admitted. Retrying sends the existing Student ID and temporary password again.</p>
+          <h2>Admission notification failures</h2>
+          <p className="ap-muted">These students are already admitted. Retrying sends the existing Student ID and temporary password by email and SMS.</p>
           {smsFailures.length ? (
             <div className="ap-stack">
               {smsFailures.map((student) => (
@@ -166,25 +200,25 @@ export default function AcademyAdmissionsAdminPage() {
                   <div className="ap-card-heading">
                     <div>
                       <h3>{fullName(student)}</h3>
-                      <p className="ap-muted">{student.studentId} · {student.phone}</p>
+                      <p className="ap-muted">{student.studentId} · {student.failedChannels}</p>
                     </div>
-                    <span className="ap-chip ap-chip-pending">SMS failed</span>
+                    <span className="ap-chip ap-chip-pending">Delivery failed</span>
                   </div>
-                  <p>{student.smsError || 'mNotify did not confirm delivery.'}</p>
-                  <p className="ap-muted">Last attempt: {displayDate(student.smsFailedAt)}</p>
+                  <p>{student.notificationError || 'One or more channels did not confirm delivery.'}</p>
+                  <p className="ap-muted">Last attempt: {displayDate(student.notificationFailedAt)}</p>
                   <button
                     className="ap-button"
                     type="button"
-                    onClick={() => retryAdmissionSms(student)}
+                    onClick={() => retryAdmissionNotifications(student)}
                     disabled={saving === student.id}
                   >
-                    {saving === student.id ? 'Retrying…' : 'Retry SMS'}
+                    {saving === student.id ? 'Retrying…' : 'Retry email and SMS'}
                   </button>
                 </article>
               ))}
             </div>
           ) : !loading ? (
-            <div className="ap-card ap-empty"><p>No failed admission SMS messages.</p></div>
+            <div className="ap-card ap-empty"><p>No failed admission notifications.</p></div>
           ) : null}
         </section>
       </main>

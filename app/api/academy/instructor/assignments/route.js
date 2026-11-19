@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 
 const academy = require('../../../../../backend/academy-db');
 const staffAuth = require('../../../../../lib/academy-staff');
+const {
+  sendStudentNotifications,
+  summarizeStudentNotifications,
+} = require('../../../../../lib/academy-notifications');
 const { noDbErrorResponse } = require('../../../../../lib/api-helpers');
 
 export async function GET(request) {
@@ -62,7 +66,18 @@ export async function POST(request) {
     if (!assignment) {
       return NextResponse.json({ error: 'Course not found or not assigned to you.' }, { status: 404 });
     }
-    return NextResponse.json(assignment, { status: 201 });
+    const [students, course] = await Promise.all([
+      academy.listStudentsForCourseSession(assignment.courseId, assignment.sessionId),
+      academy.getCourse(assignment.courseId),
+    ]);
+    const due = assignment.dueAt ? new Date(assignment.dueAt).toLocaleString() : 'No deadline set';
+    const notifications = summarizeStudentNotifications(await sendStudentNotifications(students, {
+      type: 'assignment_posted',
+      subject: `New assignment: ${assignment.title}`,
+      emailMessage: `A new assignment is available in ${course?.title || 'your course'}.\n\n${assignment.title}\nDue: ${due}\n\nSign in to the MITA Academy portal to read the instructions and submit your work.`,
+      smsMessage: `New MITA Academy assignment in ${course?.title || 'your course'}: ${assignment.title}. Due: ${due}.`,
+    }));
+    return NextResponse.json({ ...assignment, notifications }, { status: 201 });
   } catch (err) {
     const noDb = noDbErrorResponse(err);
     if (noDb) return noDb;

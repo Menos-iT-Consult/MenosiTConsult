@@ -26,9 +26,11 @@ export async function GET(request) {
         firstName: student.firstName,
         lastName: student.lastName,
         phone: student.phone,
+        email: student.email,
         studentId: student.studentId,
-        smsError: student.smsError,
-        smsFailedAt: student.smsFailedAt,
+        failedChannels: student.failedChannels,
+        notificationError: student.notificationError,
+        notificationFailedAt: student.notificationFailedAt,
       })),
     });
   } catch (error) {

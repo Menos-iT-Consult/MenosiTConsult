@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 const academy = require('../../../../backend/academy-db');
 const storage = require('../../../../backend/academy-r2');
 const { noDbErrorResponse } = require('../../../../lib/api-helpers');
+const { sendStudentNotification } = require('../../../../lib/academy-notifications');
 const { validatePassportPhoto } = require('../../../../lib/academy-passport-photo');
 const {
   getCountryRegions,
@@ -228,6 +229,20 @@ export async function POST(request) {
     });
     photoKey = '';
 
+    const portalUrl = new URL(
+      '/academy/login',
+      process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || new URL(request.url).origin
+    ).toString();
+    const name = [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ');
+    const notifications = await sendStudentNotification(student, {
+      type: 'application_received',
+      subject: 'MITA Academy application received',
+      emailMessage: `Hello ${name},\n\nWe have received your application to ${program.name}. The admissions team will review it and contact you with an update.\n\nYou can return to the Academy portal at ${portalUrl}.`,
+      smsMessage: `MITA Academy: We received your application to ${program.name}. The admissions team will contact you after review.`,
+    });
+    const confirmation = notifications.email.sent && notifications.sms.sent
+      ? 'Email and SMS confirmations were sent.'
+      : 'Your application was received, but one or more confirmations could not be sent. The Academy will still review it.';
     return NextResponse.json({
       success: true,
       application: {
@@ -235,8 +250,8 @@ export async function POST(request) {
         lastName: student.lastName,
         program: program.name,
       },
-      message:
-        'Application received. Once the admissions office reviews it, you will get your Student ID by SMS.',
+      notifications,
+      message: `Application received. ${confirmation} Once the admissions office reviews it, you will receive your admission decision and portal details.`,
     });
   } catch (err) {
     if (photoKey) {

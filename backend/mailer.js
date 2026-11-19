@@ -465,6 +465,22 @@ async function sendInstructorInvitationEmail({ to, name, setupUrl }) {
   return { ok: true };
 }
 
+async function sendAcademyNotificationEmail({ to, subject, message, transporter = getAcademyTransporter() }) {
+  if (!transporter) return { ok: false, error: 'Academy SMTP is not configured.' };
+  if (typeof to !== 'string' || !to.trim()) return { ok: false, error: 'The student does not have an email address.' };
+  const safeSubject = String(subject || 'MITA Academy notification').replace(/[\r\n]/g, ' ').trim();
+  const text = typeof message === 'string' ? message.trim() : '';
+  if (!text) return { ok: false, error: 'The Academy email message is empty.' };
+
+  await transporter.sendMail({
+    from: `"MITA Academy" <${process.env.ACADEMY_SMTP_FROM || 'academy@menositconsult.com'}>`,
+    to: to.trim(),
+    subject: safeSubject,
+    text,
+  });
+  return { ok: true };
+}
+
 module.exports = {
   sendContactEmails,
   sendWelcomeEmail,
@@ -472,6 +488,7 @@ module.exports = {
   getMainFromAddress,
   getTransporter,
   getAcademyTransporter,
+  sendAcademyNotificationEmail,
   sendTipEmails,
   sendInstructorInvitationEmail,
 };

@@ -8,6 +8,7 @@ const {
   TEMPLATE_SETTING_KEY,
   createCertificatePdf,
 } = require('../../../../../../../lib/academy-certificates');
+const { sendStudentNotification } = require('../../../../../../../lib/academy-notifications');
 const { noDbErrorResponse } = require('../../../../../../../lib/api-helpers');
 
 async function removeGeneratedDocument(key) {
@@ -77,6 +78,11 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: 'A certificate was issued to this student by another administrator.' }, { status: 409 });
     }
     documentKey = '';
+    const notifications = await sendStudentNotification(student, {
+      type: 'certificate_issued',
+      subject: 'Your MITA Academy certificate is ready',
+      message: `Your certificate for ${program.name} has been issued. Sign in to the MITA Academy portal to view and download it.`,
+    });
     return NextResponse.json({
       certificate: {
         certificateNumber: certificate.certificateNumber,
@@ -85,6 +91,7 @@ export async function POST(request, { params }) {
         issueDate: certificate.issueDate,
         issuedAt: certificate.issuedAt,
       },
+      notifications,
     }, { status: 201 });
   } catch (error) {
     if (documentKey) await removeGeneratedDocument(documentKey);

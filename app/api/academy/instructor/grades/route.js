@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 const academy = require('../../../../../backend/academy-db');
 const staffAuth = require('../../../../../lib/academy-staff');
+const { sendStudentNotification } = require('../../../../../lib/academy-notifications');
 const { noDbErrorResponse } = require('../../../../../lib/api-helpers');
 
 export async function GET(request) {
@@ -39,7 +40,19 @@ export async function POST(request) {
     if (!grade) {
       return NextResponse.json({ error: 'Enrollment not found or not in an assigned course.' }, { status: 404 });
     }
-    return NextResponse.json(grade);
+    const enrollment = await academy.getEnrollment(enrollmentId);
+    const [student, course] = await Promise.all([
+      enrollment ? academy.getStudent(enrollment.student_id) : null,
+      enrollment ? academy.getCourse(enrollment.course_id) : null,
+    ]);
+    const notifications = student
+      ? await sendStudentNotification(student, {
+          type: 'grade_published',
+          subject: `Grade updated: ${course?.title || 'your course'}`,
+          message: `A grade has been published or updated for ${course?.title || 'your course'}. Sign in to the MITA Academy portal to view your results.`,
+        })
+      : null;
+    return NextResponse.json({ ...grade, notifications });
   } catch (err) {
     const noDb = noDbErrorResponse(err);
     if (noDb) return noDb;

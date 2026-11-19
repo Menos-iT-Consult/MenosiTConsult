@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 const academy = require('../../../../../../backend/academy-db');
 const staffAuth = require('../../../../../../lib/academy-staff');
+const { sendStudentNotification } = require('../../../../../../lib/academy-notifications');
 const { noDbErrorResponse } = require('../../../../../../lib/api-helpers');
 
 export async function PUT(request, { params }) {
@@ -26,7 +27,19 @@ export async function PUT(request, { params }) {
     if (!submission) {
       return NextResponse.json({ error: 'Submission not found or not in an assigned course.' }, { status: 404 });
     }
-    return NextResponse.json(submission);
+    const assignment = await academy.getAssignment(submission.assignmentId);
+    const [student, course] = await Promise.all([
+      academy.getStudent(submission.studentId),
+      assignment ? academy.getCourse(assignment.course_id) : null,
+    ]);
+    const notifications = student
+      ? await sendStudentNotification(student, {
+          type: 'assignment_result_published',
+          subject: `Assignment graded: ${assignment?.title || 'your assignment'}`,
+          message: `Your assignment "${assignment?.title || 'assignment'}" in ${course?.title || 'your course'} has been graded. Sign in to the MITA Academy portal to view your score and feedback.`,
+        })
+      : null;
+    return NextResponse.json({ ...submission, notifications });
   } catch (err) {
     const noDb = noDbErrorResponse(err);
     if (noDb) return noDb;

@@ -3,11 +3,7 @@ import { NextResponse } from 'next/server';
 const academy = require('../../../../../../../backend/academy-db');
 const staffAuth = require('../../../../../../../lib/academy-staff');
 const { noDbErrorResponse } = require('../../../../../../../lib/api-helpers');
-const {
-  getMnotifyConfigurationError,
-  normalizeGhanaRecipient,
-} = require('../../../../../../../lib/academy-sms');
-const { sendAndLogAdmissionSms } = require('../../../../../../../lib/academy-admission-sms');
+const { sendAndLogAdmissionNotification } = require('../../../../../../../lib/academy-admission-sms');
 
 function getStudentPortalUrl(request) {
   const siteUrl = process.env.SITE_URL ||
@@ -21,31 +17,20 @@ export async function POST(request, { params }) {
     const gate = await staffAuth.requireAdministrator(request);
     if (gate.error) return NextResponse.json({ error: gate.error }, { status: gate.status });
 
-    const configurationError = getMnotifyConfigurationError();
-    if (configurationError) {
-      return NextResponse.json({ error: configurationError }, { status: 503 });
-    }
-
     const { id } = await params;
     const applicant = await academy.getStudent(id);
     if (!applicant) return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
     if (applicant.status !== 'pending') {
       return NextResponse.json({ error: 'This application is no longer pending.' }, { status: 409 });
     }
-    if (!normalizeGhanaRecipient(applicant.phone)) {
-      return NextResponse.json(
-        { error: 'mNotify quick SMS requires a valid Ghana number. International numbers need an approved mNotify template.' },
-        { status: 400 }
-      );
-    }
-
     const portalUrl = getStudentPortalUrl(request);
     const student = await academy.admitStudent(id);
     if (!student) {
       return NextResponse.json({ error: 'This application is no longer pending.' }, { status: 409 });
     }
 
-    const sms = await sendAndLogAdmissionSms(student, portalUrl);
+    const notifications = await sendAndLogAdmissionNotification(student, portalUrl);
+    const delivered = notifications.email.sent && notifications.sms.sent;
     return NextResponse.json(
       {
         student: {
@@ -54,10 +39,11 @@ export async function POST(request, { params }) {
           lastName: student.lastName,
           studentId: student.studentId,
         },
-        sms: { sent: sms.ok },
-        ...(sms.ok ? {} : { error: `Admission approved, but the SMS could not be sent: ${sms.error}` }),
+        sms: { sent: notifications.sms.sent },
+        notifications,
+        ...(!delivered ? { error: 'Admission approved, but one or more email/SMS notifications could not be sent.' } : {}),
       },
-      { status: sms.ok ? 200 : 502 }
+      { status: delivered ? 200 : 502 }
     );
   } catch (error) {
     const noDb = noDbErrorResponse(error);

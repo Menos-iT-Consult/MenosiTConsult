@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 const academy = require('../../../../backend/academy-db');
 const auth = require('../../../../lib/academy-auth');
 const staffAuth = require('../../../../lib/academy-staff');
+const { sendStudentNotification } = require('../../../../lib/academy-notifications');
 const { noDbErrorResponse } = require('../../../../lib/api-helpers');
 
 async function activeStudent(request) {
@@ -63,7 +64,22 @@ export async function POST(request) {
       sessionId: body.sessionId,
       status: body.status,
     });
-    return NextResponse.json(enrollment, { status: 201 });
+    const [student, course, sessions] = await Promise.all([
+      academy.getStudent(body.studentId),
+      academy.getCourse(body.courseId),
+      academy.listSessions(),
+    ]);
+    const session = sessions.find((item) => item.id === body.sessionId);
+    const title = course?.title || 'a course';
+    const sessionName = session?.name || 'your Academy session';
+    const notifications = student
+      ? await sendStudentNotification(student, {
+          type: 'course_enrollment',
+          subject: `Course enrollment confirmed: ${title}`,
+          message: `You have been enrolled in ${title} for ${sessionName}. Sign in to the MITA Academy portal to view your course.`,
+        })
+      : null;
+    return NextResponse.json({ ...enrollment, notifications }, { status: 201 });
   } catch (err) {
     const noDb = noDbErrorResponse(err);
     if (noDb) return noDb;

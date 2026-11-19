@@ -3,8 +3,7 @@ import { NextResponse } from 'next/server';
 const academy = require('../../../../../../../backend/academy-db');
 const staffAuth = require('../../../../../../../lib/academy-staff');
 const { noDbErrorResponse } = require('../../../../../../../lib/api-helpers');
-const { getMnotifyConfigurationError } = require('../../../../../../../lib/academy-sms');
-const { sendAndLogAdmissionSms } = require('../../../../../../../lib/academy-admission-sms');
+const { sendAndLogAdmissionNotification } = require('../../../../../../../lib/academy-admission-sms');
 
 function getStudentPortalUrl(request) {
   const siteUrl = process.env.SITE_URL ||
@@ -18,11 +17,6 @@ export async function POST(request, { params }) {
     const gate = await staffAuth.requireAdministrator(request);
     if (gate.error) return NextResponse.json({ error: gate.error }, { status: gate.status });
 
-    const configurationError = getMnotifyConfigurationError();
-    if (configurationError) {
-      return NextResponse.json({ error: configurationError }, { status: 503 });
-    }
-
     const { id } = await params;
     const student = await academy.getStudent(id);
     if (
@@ -34,13 +28,15 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: 'Admitted student not found.' }, { status: 404 });
     }
 
-    const sms = await sendAndLogAdmissionSms(student, getStudentPortalUrl(request));
+    const notifications = await sendAndLogAdmissionNotification(student, getStudentPortalUrl(request));
+    const delivered = notifications.email.sent && notifications.sms.sent;
     return NextResponse.json(
       {
-        sms: { sent: sms.ok },
-        ...(sms.ok ? {} : { error: `The SMS could not be sent: ${sms.error}` }),
+        sms: { sent: notifications.sms.sent },
+        notifications,
+        ...(!delivered ? { error: 'One or more email/SMS notifications could not be sent.' } : {}),
       },
-      { status: sms.ok ? 200 : 502 }
+      { status: delivered ? 200 : 502 }
     );
   } catch (error) {
     const noDb = noDbErrorResponse(error);

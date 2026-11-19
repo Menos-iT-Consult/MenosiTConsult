@@ -150,9 +150,18 @@ async function ensureAcademySchema(query) {
     student_id text, session_id text,
     title text, amount numeric,
     due_date text,
+    paid boolean DEFAULT false,
     status text DEFAULT 'unpaid',
+    created_by text,
     created_at timestamptz DEFAULT now()
   );`);
+  await query(`ALTER TABLE academy_invoices
+    ADD COLUMN IF NOT EXISTS paid boolean DEFAULT false,
+    ADD COLUMN IF NOT EXISTS created_by text;`);
+  await query(`UPDATE academy_invoices
+    SET paid = COALESCE(paid, status = 'paid', false)
+    WHERE paid IS NULL OR (status = 'paid' AND paid = false);`);
+  await query('ALTER TABLE academy_invoices ALTER COLUMN paid SET DEFAULT false;');
   await query(`CREATE TABLE IF NOT EXISTS academy_payments (
     id text PRIMARY KEY,
     student_id text, invoice_id text,

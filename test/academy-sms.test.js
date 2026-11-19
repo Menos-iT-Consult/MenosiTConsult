@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
   getMnotifyConfigurationError,
   normalizeGhanaRecipient,
+  sendAcademySms,
   sendAdmissionSms,
 } = require('../lib/academy-sms');
 
@@ -107,4 +108,25 @@ test('requires mNotify to confirm at least one recipient was sent', async () => 
 
   assert.equal(result.ok, false);
   assert.match(result.error, /could not send the SMS/);
+});
+
+test('sends generic Academy SMS notifications through mNotify', async () => {
+  let requestBody;
+  const result = await sendAcademySms({
+    phone: '+233 24 123 4567',
+    message: 'Your class schedule changed.',
+    env: configuredEnvironment,
+    fetchImpl: async (_url, request) => {
+      requestBody = JSON.parse(request.body);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ status: 'success', summary: { total_sent: 1 } }),
+      };
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(requestBody.recipient[0], '0241234567');
+  assert.equal(requestBody.message, 'Your class schedule changed.');
 });

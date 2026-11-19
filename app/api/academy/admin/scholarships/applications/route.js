@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 const academy = require('../../../../../../backend/academy-db');
 const staffAuth = require('../../../../../../lib/academy-staff');
+const { sendStudentNotification } = require('../../../../../../lib/academy-notifications');
 const { noDbErrorResponse } = require('../../../../../../lib/api-helpers');
 
 export async function GET(request) {
@@ -41,7 +42,18 @@ export async function PATCH(request) {
       reviewNote
     );
     if (!application) return NextResponse.json({ error: 'Scholarship application not found.' }, { status: 404 });
-    return NextResponse.json({ application });
+    const student = await academy.getStudent(application.studentId);
+    const isApproved = application.status === 'approved';
+    const notifications = student
+      ? await sendStudentNotification(student, {
+          type: `scholarship_application_${application.status}`,
+          subject: `MITA Academy scholarship application ${application.status}`,
+          message: isApproved
+            ? `Your application for ${application.scholarshipName} has been approved. The scholarship is now assigned to your student account.`
+            : `Your application for ${application.scholarshipName} was not approved.${application.reviewNote ? ` Administrator feedback: ${application.reviewNote}` : ''}`,
+        })
+      : null;
+    return NextResponse.json({ application, notifications });
   } catch (error) {
     const noDb = noDbErrorResponse(error);
     if (noDb) return noDb;

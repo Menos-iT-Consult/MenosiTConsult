@@ -7,6 +7,7 @@ const {
   calculateSemesterFee,
   normalizeAmount,
 } = require('../../../../../../lib/academy-finance');
+const { sendStudentNotification } = require('../../../../../../lib/academy-notifications');
 const { noDbErrorResponse } = require('../../../../../../lib/api-helpers');
 
 async function getDetails(id) {
@@ -90,7 +91,14 @@ export async function PATCH(request, { params }) {
 
     await academy.assignStudentScholarship(id, scholarshipId, gate.staff.id);
     const details = await getDetails(id);
-    return NextResponse.json(details, { headers: { 'Cache-Control': 'private, no-store' } });
+    const notifications = scholarshipId
+      ? await sendStudentNotification(student, {
+          type: 'scholarship_awarded',
+          subject: 'MITA Academy scholarship awarded',
+          message: `The Academy has awarded you the ${details.scholarship.name}. Your student fee information has been updated.`,
+        })
+      : null;
+    return NextResponse.json({ ...details, notifications }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
     const noDb = noDbErrorResponse(error);
     if (noDb) return noDb;

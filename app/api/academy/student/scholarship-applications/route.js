@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 const academy = require('../../../../../backend/academy-db');
 const auth = require('../../../../../lib/academy-auth');
 const { normalizeScholarshipApplicationInput } = require('../../../../../lib/academy-finance');
+const { sendStudentNotification } = require('../../../../../lib/academy-notifications');
 const { noDbErrorResponse } = require('../../../../../lib/api-helpers');
 
 async function getActiveStudent(request) {
@@ -72,7 +73,12 @@ export async function POST(request) {
       input.scholarshipId,
       input.statement
     );
-    return NextResponse.json({ application }, { status: 201 });
+    const notifications = await sendStudentNotification(student, {
+      type: 'scholarship_application_received',
+      subject: 'MITA Academy scholarship application received',
+      message: `We received your application for ${application.scholarshipName}. An Academy administrator will review it and notify you of the decision.`,
+    });
+    return NextResponse.json({ application, notifications }, { status: 201 });
   } catch (error) {
     const noDb = noDbErrorResponse(error);
     if (noDb) return noDb;

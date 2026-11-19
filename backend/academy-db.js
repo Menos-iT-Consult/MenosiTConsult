@@ -1250,6 +1250,34 @@ async function listInstructorRoster(courseId, staffId) {
   }));
 }
 
+async function listStudentsForCourseSession(courseId, sessionId) {
+  const { rows } = await q(
+    `SELECT DISTINCT student.*
+       FROM academy_students student
+       JOIN academy_enrollments enrollment ON enrollment.student_id = student.id
+      WHERE enrollment.course_id = $1 AND enrollment.session_id = $2
+        AND enrollment.status IN ('enrolled', 'active')
+        AND student.status = 'active'
+      ORDER BY student.last_name, student.first_name`,
+    [courseId, sessionId]
+  );
+  return rows.map(mapStudent);
+}
+
+async function listStudentsForSession(sessionId) {
+  const { rows } = await q(
+    `SELECT DISTINCT student.*
+       FROM academy_students student
+       JOIN academy_enrollments enrollment ON enrollment.student_id = student.id
+      WHERE enrollment.session_id = $1
+        AND enrollment.status IN ('enrolled', 'active')
+        AND student.status = 'active'
+      ORDER BY student.last_name, student.first_name`,
+    [sessionId]
+  );
+  return rows.map(mapStudent);
+}
+
 // ── academy sessions ────────────────────────────────────────────────────────
 async function listSessions({ currentOnly } = {}) {
   const where = currentOnly ? 'WHERE is_current = true' : '';
@@ -2287,7 +2315,8 @@ async function createExam(e) {
   const { rows } = await q(
     `INSERT INTO academy_exams
       (id, session_id, course_id, title, date, start_time, end_time, venue, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+     RETURNING *`,
     [
       e.id || newId('acex'),
       e.sessionId,
@@ -2356,8 +2385,8 @@ async function getInvoice(id) {
 async function createInvoice(i) {
   const { rows } = await q(
     `INSERT INTO academy_invoices
-      (id, student_id, session_id, title, amount, due_date, paid, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      (id, student_id, session_id, title, amount, due_date, paid, status, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
     [
       i.id || newId('acin'),
       i.studentId,
@@ -2365,7 +2394,8 @@ async function createInvoice(i) {
       i.title,
       i.amount,
       i.dueDate,
-      i.paid !== undefined ? i.paid : false,
+      i.paid === true,
+      i.paid === true ? 'paid' : 'unpaid',
       i.createdBy || null,
     ]
   );
@@ -2378,7 +2408,8 @@ async function updateInvoice(id, i) {
          SET title = COALESCE($2, title),
              amount = COALESCE($3, amount),
              due_date = COALESCE($4, due_date),
-             paid = COALESCE($5, paid)
+             paid = COALESCE($5, paid),
+             status = CASE WHEN COALESCE($5, paid) THEN 'paid' ELSE 'unpaid' END
        WHERE id = $1 RETURNING *`,
     [
       id,
@@ -2418,27 +2449,106 @@ async function listNotifications(studentId) {
   return rows.map(mapNotification);
 }
 
+async function getNotificationStatuses(studentId, type, eventId) {
+  const { rows } = await q(
+    `SELECT DISTINCT ON (channel) channel, status, error, created_at
+       FROM academy_notifications
+      WHERE student_id = $1 AND type = $2 AND payload->>'eventId' = $3
+      ORDER BY channel, created_at DESC`,
+    [studentId, type, eventId]
+  );
+  return rows;
+}
+
+async function listInvoiceReminderCandidates() {
+  const { rows } = await q(
+    `SELECT student.*, invoice.id AS invoice_id, invoice.title AS invoice_title,
+            invoice.amount AS invoice_amount, invoice.due_date,
+            CASE WHEN invoice.due_date = to_char(CURRENT_DATE, 'YYYY-MM-DD')
+                 THEN 'invoice_due_today' ELSE 'invoice_overdue' END AS reminder_type
+       FROM academy_invoices invoice
+       JOIN academy_students student ON student.id = invoice.student_id
+      WHERE invoice.paid = false
+        AND invoice.due_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+        AND invoice.due_date <= to_char(CURRENT_DATE, 'YYYY-MM-DD')
+        AND student.status = 'active'
+      ORDER BY invoice.due_date, student.last_name, student.first_name`
+  );
+  return rows.map((row) => ({
+    student: mapStudent(row),
+    invoiceId: row.invoice_id,
+    title: row.invoice_title || 'Academy fee',
+    amount: Number(row.invoice_amount) || 0,
+    dueDate: dateOnly(row.due_date),
+    type: row.reminder_type,
+    eventId: `${row.invoice_id}:${dateOnly(row.due_date)}`,
+  }));
+}
+
+async function listAssignmentReminderCandidates() {
+  const { rows } = await q(
+    `SELECT DISTINCT student.*, assignment.id AS assignment_id,
+            assignment.title AS assignment_title, assignment.due_at,
+            CASE WHEN assignment.due_at <= now()
+                 THEN 'assignment_overdue_reminder'
+                 ELSE 'assignment_deadline_reminder' END AS reminder_type,
+            course.title AS course_title
+       FROM academy_assignments assignment
+       JOIN academy_courses course ON course.id = assignment.course_id
+       JOIN academy_enrollments enrollment
+         ON enrollment.course_id = assignment.course_id
+        AND enrollment.session_id = assignment.session_id
+        AND enrollment.status IN ('enrolled', 'active')
+       JOIN academy_students student ON student.id = enrollment.student_id
+      WHERE student.status = 'active'
+        AND assignment.due_at BETWEEN now() - interval '7 days'
+                                  AND now() + interval '24 hours'
+        AND NOT EXISTS (
+          SELECT 1
+            FROM academy_submissions submission
+           WHERE submission.assignment_id = assignment.id
+             AND submission.student_id = student.id
+        )
+      ORDER BY assignment.due_at, student.last_name, student.first_name`
+  );
+  return rows.map((row) => ({
+    student: mapStudent(row),
+    assignmentId: row.assignment_id,
+    title: row.assignment_title || 'Assignment',
+    courseName: row.course_title || 'your course',
+    type: row.reminder_type,
+    dueAt: row.due_at instanceof Date ? row.due_at.toISOString() : String(row.due_at),
+    eventId: `${row.assignment_id}:${row.due_at instanceof Date ? row.due_at.toISOString() : String(row.due_at)}`,
+  }));
+}
+
 async function listFailedAdmissionSms() {
   const { rows } = await q(
-    `SELECT s.*, latest.error AS sms_error, latest.created_at AS sms_failed_at
+    `SELECT s.*, latest.failed_channels, latest.failure_error, latest.failed_at
        FROM academy_students s
        JOIN LATERAL (
-         SELECT status, error, created_at
-           FROM academy_notifications
-          WHERE student_id = s.id AND channel = 'sms' AND type = 'admission_approved'
-          ORDER BY created_at DESC
-          LIMIT 1
+         SELECT string_agg(channel, ', ' ORDER BY channel) AS failed_channels,
+                string_agg(channel || ': ' || COALESCE(error, 'Delivery failed'), '; ' ORDER BY channel) AS failure_error,
+                max(created_at) AS failed_at
+           FROM (
+             SELECT DISTINCT ON (channel) channel, status, error, created_at
+               FROM academy_notifications
+              WHERE student_id = s.id AND type = 'admission_approved'
+              ORDER BY channel, created_at DESC
+           ) latest
+          WHERE status = 'failed'
        ) latest ON true
       WHERE s.status = 'active'
         AND s.must_change_password = true
-        AND latest.status = 'failed'
-      ORDER BY latest.created_at DESC
+        AND latest.failed_channels IS NOT NULL
+      ORDER BY latest.failed_at DESC
       LIMIT 100`
   );
   return rows.map((row) => ({
     ...mapStudent(row),
-    smsError: row.sms_error || '',
-    smsFailedAt: iso(row.sms_failed_at),
+    failedChannels: row.failed_channels || '',
+    notificationError: row.failure_error || '',
+    notificationFailedAt: iso(row.failed_at),
   }));
 }
 
@@ -2559,7 +2669,7 @@ module.exports = {
   createScholarshipApplication, reviewScholarshipApplication, assignStudentScholarship,
   // courses
   createCourse, listCourses, getCourse, setInstructorCourses, isCourseAssignedToInstructor,
-  listInstructorRoster,
+  listInstructorRoster, listStudentsForCourseSession, listStudentsForSession,
   // sessions
   listSessions, createAcademySession, listEnrollmentsBySession, getStudentPortalData,
   // enrollments
@@ -2587,7 +2697,9 @@ module.exports = {
   // invoices
   listInvoices, getInvoice, createInvoice, updateInvoice, deleteInvoice,
   // notifications
-  logNotification, listNotifications, listFailedAdmissionSms, listAnnouncements, createAnnouncement,
+  logNotification, listNotifications, getNotificationStatuses,
+  listInvoiceReminderCandidates, listAssignmentReminderCandidates,
+  listFailedAdmissionSms, listAnnouncements, createAnnouncement,
   // certificates and settings
   getStudentCertificate, createStudentCertificate,
   getAcademySetting, setAcademySetting,

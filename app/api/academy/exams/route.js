@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
 const academy = require('../../../../backend/academy-db');
+const staffAuth = require('../../../../lib/academy-staff');
+const {
+  sendStudentNotifications,
+  summarizeStudentNotifications,
+} = require('../../../../lib/academy-notifications');
 
 export async function GET(request) {
   try {
@@ -27,6 +32,8 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
+    const gate = await staffAuth.requireAdministrator(request);
+    if (gate.error) return NextResponse.json({ error: gate.error }, { status: gate.status });
     const body = await request.json().catch(() => ({}));
     const exam = await academy.createExam({
       sessionId: body.sessionId,
@@ -36,9 +43,23 @@ export async function POST(request) {
       startTime: body.startTime,
       endTime: body.endTime,
       venue: body.venue,
-      createdBy: body.createdBy,
+      createdBy: gate.staff.id,
     });
-    return NextResponse.json(exam);
+    const [students, course] = await Promise.all([
+      academy.listStudentsForCourseSession(body.courseId, body.sessionId),
+      academy.getCourse(body.courseId),
+    ]);
+    const dateTime = [body.date, body.startTime].filter(Boolean).join(' at ') || 'Date and time to be announced';
+    const deliveries = await sendStudentNotifications(students, {
+      type: 'exam_scheduled',
+      subject: `MITA Academy exam scheduled: ${body.title}`,
+      emailMessage: `An exam has been scheduled for ${course?.title || 'your course'}.\n\n${body.title}\nDate and time: ${dateTime}${body.venue ? `\nVenue: ${body.venue}` : ''}.`,
+      smsMessage: `MITA Academy exam: ${body.title} for ${course?.title || 'your course'} is scheduled ${dateTime}${body.venue ? ` at ${body.venue}` : ''}.`,
+    });
+    return NextResponse.json({
+      ...exam,
+      notifications: summarizeStudentNotifications(deliveries),
+    }, { status: 201 });
   } catch (err) {
     console.error('Academy exam create error:', err);
     return NextResponse.json(
