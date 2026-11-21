@@ -12,6 +12,7 @@ const PORTALS = {
     login: '/academy/login',
     links: [
       { href: '/academy/dashboard', label: 'Dashboard', icon: 'dashboard' },
+      { href: '/academy/notifications', label: 'Notifications', icon: 'announcements' },
       { href: '/academy/courses', label: 'Courses', icon: 'courses' },
       { href: '/academy/assignments', label: 'Assignments', icon: 'assignments' },
       { href: '/academy/fees', label: 'Fees', icon: 'fees' },
@@ -19,6 +20,7 @@ const PORTALS = {
       { href: '/academy/reports', label: 'Grades & exams', icon: 'reports' },
       { href: '/academy/attendance', label: 'Attendance', icon: 'attendance' },
       { href: '/academy/timetable', label: 'Timetable', icon: 'timetable' },
+      { href: '/academy/support', label: 'Help desk', icon: 'support' },
       {
         href: '/academy/profile',
         label: 'Profile',
@@ -41,6 +43,9 @@ const PORTALS = {
       { href: '/academy/admin/programs', label: 'Programs & fees', icon: 'courses' },
       { href: '/academy/admin/instructors', label: 'Instructors & courses', icon: 'courses' },
       { href: '/academy/admin/announcements', label: 'Announcements', icon: 'announcements' },
+      { href: '/academy/admin/payments', label: 'Payment review', icon: 'fees' },
+      { href: '/academy/admin/support', label: 'Student support', icon: 'support' },
+      { href: '/academy/admin/reports', label: 'Reports', icon: 'reports' },
       { href: '/academy/admin/certificates', label: 'Certificates', icon: 'certificate' },
     ],
   },
@@ -142,6 +147,12 @@ function NavigationIcon({ name }) {
     announcements: (
       <>
         <path d="M4 13h3l11 5V6L7 11H4zM7 13l2 7h4l-2-5M21 9v6" />
+      </>
+    ),
+    support: (
+      <>
+        <path d="M4 13v-2a8 8 0 0 1 16 0v2" />
+        <path d="M4 13h3v6H6a2 2 0 0 1-2-2zM20 13h-3v6h1a2 2 0 0 0 2-2zM17 20a5 5 0 0 1-5 2h-1" />
       </>
     ),
     logout: (

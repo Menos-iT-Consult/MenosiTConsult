@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import useStudentPortalData from '../../useStudentPortalData';
 import EnrollCourseButton from '../EnrollCourseButton';
+import CourseLessons from '../CourseLessons';
 
 function safeResourceUrl(value) {
   return typeof value === 'string' && (/^https?:\/\//i.test(value) || /^\/(?!\/)/.test(value));
@@ -75,6 +76,11 @@ export default function CourseDetailsPage() {
     (entry) => entry.course_id === courseId &&
       courses.some((enrollment) => enrollment.session_id === entry.session_id)
   );
+  const courseLessons = (data.lessonProgress || []).filter((lesson) =>
+    lesson.courseId === courseId && courses.some((enrollment) =>
+      !lesson.sessionId || enrollment.session_id === lesson.sessionId
+    )
+  );
 
   return (
     <main className="ap-main">
@@ -92,6 +98,8 @@ export default function CourseDetailsPage() {
           <span>Current grade: {course.letter || course.total} ({course.total})</span>
         )}
       </div>
+
+      {courseLessons.length > 0 && <CourseLessons lessons={courseLessons} />}
 
       <section className="ap-section">
         <div className="ap-card-heading"><h2>Course materials & assignments</h2></div>

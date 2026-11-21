@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import useStudentPortalData from '../useStudentPortalData';
+import StudentPaymentCenter from './StudentPaymentCenter';
 
 function formatAmount(value, currency = 'GHS') {
   const amount = Number(value);
@@ -91,6 +92,8 @@ export default function StudentFeesPage() {
           <strong>{formatAmount(outstandingTotal, currency)}</strong>
         </article>
       </section>
+
+      <StudentPaymentCenter invoices={invoices} />
 
       <section className="ap-section">
         <div className="ap-card-heading">

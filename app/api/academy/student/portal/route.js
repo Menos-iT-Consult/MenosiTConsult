@@ -18,10 +18,13 @@ export async function GET(request) {
     }
 
     const portal = await academy.getStudentPortalData(student.id);
-    const [program, scholarship, programCourses] = await Promise.all([
+    const [program, scholarship, programCourses, lessonProgress, notifications, unreadNotificationCount] = await Promise.all([
       student.programId ? academy.getProgram(student.programId) : null,
       academy.getStudentScholarship(student.id),
       student.programId ? academy.listCourses({ programId: student.programId }) : [],
+      academy.listStudentLessons(student.id),
+      academy.listStudentPortalNotifications(student.id, 8),
+      academy.countUnreadStudentPortalNotifications(student.id),
     ]);
     const feePerSemester = program?.feeStructure?.feePerSemester;
     const semesterFee = feePerSemester == null
@@ -45,6 +48,10 @@ export async function GET(request) {
             scholarshipName: scholarship?.name || '',
           },
       programCourses: programCourses.filter((course) => course.published),
+      lessonProgress,
+      notifications,
+      unreadNotificationCount,
+      courseProgress: require('../../../../../lib/academy-portal').courseLessonProgress(lessonProgress),
       ...portal,
     });
   } catch (err) {

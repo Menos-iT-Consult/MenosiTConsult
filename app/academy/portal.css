@@ -650,6 +650,54 @@
 .ap-course-start h2 { margin: 0; }
 .ap-course-start p { margin: 8px 0 0; color: #64748b; line-height: 1.6; }
 .ap-course-start .ap-course-enroll-control { width: auto; flex: none; }
+.ap-progress-track { height: 10px; overflow: hidden; margin: 12px 0 18px; border-radius: 999px; background: #e2e8f0; }
+.ap-progress-track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #0879bd, #36a5df); transition: width .2s ease; }
+.ap-lesson-list { margin-top: 14px; }
+.ap-lesson-card { display: grid; gap: 8px; }
+.ap-lesson-card > p { margin: 0; color: #64748b; line-height: 1.5; }
+.ap-lesson-toggle { display: flex; align-items: flex-start; gap: 12px; cursor: pointer; }
+.ap-lesson-toggle input { width: 18px; height: 18px; flex: none; margin-top: 2px; accent-color: var(--blue); }
+.ap-lesson-toggle span { display: grid; gap: 4px; }
+.ap-lesson-toggle small { color: #64748b; }
+.ap-progress-list { display: grid; gap: 16px; }
+.ap-dashboard-progress .ap-card-heading { margin: 0; font-size: .9rem; }
+.ap-dashboard-progress .ap-progress-track { margin: 8px 0 5px; }
+.ap-dashboard-progress small { color: #64748b; line-height: 1.4; }
+.ap-next-class { display: grid; justify-items: start; gap: 10px; }
+.ap-next-class > strong { font-size: 1.15rem; }
+.ap-next-class p { margin: 0; color: #64748b; }
+.ap-notification { display: grid; gap: 10px; }
+.ap-notification.is-unread { border-left: 4px solid var(--blue); background: #f8fbff; }
+.ap-notification h2 { margin: 0; font-size: 1rem; }
+.ap-notification > p { margin: 0; color: #475569; line-height: 1.6; white-space: pre-wrap; }
+.ap-notification-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.ap-notification-footer small { color: #64748b; }
+.ap-link-button { border: 0; padding: 0; background: none; color: var(--blue); font: inherit; font-size: .86rem; font-weight: 650; cursor: pointer; }
+.ap-link-button:disabled { cursor: wait; opacity: .6; }
+.ap-support-layout { display: grid; grid-template-columns: minmax(210px, .7fr) minmax(0, 1.6fr); align-items: start; gap: 18px; }
+.ap-support-ticket-list { display: grid; gap: 4px; padding: 8px; }
+.ap-support-ticket-option { display: grid; gap: 5px; width: 100%; padding: 12px; border: 0; border-radius: 9px; background: transparent; color: #1e293b; text-align: left; cursor: pointer; }
+.ap-support-ticket-option:hover, .ap-support-ticket-option.is-selected { background: #eff6ff; }
+.ap-support-ticket-option span, .ap-support-ticket-option small { color: #64748b; font-size: .8rem; }
+.ap-support-conversation { display: grid; gap: 16px; }
+.ap-support-conversation h3 { margin: 0; }
+.ap-support-messages { display: grid; gap: 12px; }
+.ap-support-message { max-width: 90%; padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; }
+.ap-support-message.is-admin { justify-self: end; border-color: #bfdbfe; background: #eff6ff; }
+.ap-support-message strong, .ap-support-message small { color: #64748b; font-size: .78rem; }
+.ap-support-message p { margin: 6px 0; line-height: 1.55; white-space: pre-wrap; }
+.ap-support-reply { display: grid; gap: 10px; padding-top: 14px; border-top: 1px solid #e2e8f0; }
+.ap-support-reply label { color: #475569; font-size: .87rem; font-weight: 650; }
+.ap-admin-ticket { display: grid; gap: 16px; }
+.ap-admin-ticket h2 { margin: 0; font-size: 1.1rem; }
+.ap-payment-form { margin-top: 18px; }
+.ap-payment-history { align-items: start; margin-top: 26px; }
+.ap-payment-history h2 { margin-bottom: 12px; font-size: 1.05rem; }
+.ap-payment-row { display: grid; gap: 7px; }
+.ap-payment-row .ap-card-heading { margin: 0; }
+.ap-payment-row p { margin: 0; color: #475569; }
+.ap-payment-row small { color: #64748b; }
+.ap-filter-field { display: grid; min-width: min(100%, 220px); gap: 6px; color: #475569; font-size: .85rem; font-weight: 650; }
 .ap-button {
   display: inline-flex;
   align-items: center;
@@ -1011,6 +1059,8 @@
   .ap-id-card-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
   .ap-course-start { align-items: flex-start; flex-direction: column; }
   .ap-course-start .ap-course-enroll-control { width: 100%; }
+  .ap-support-layout { grid-template-columns: minmax(0, 1fr); }
+  .ap-support-ticket-list { max-height: 260px; overflow-y: auto; }
   .ap-program-edit .ap-form-grid { grid-template-columns: minmax(0, 1fr); }
 }
 

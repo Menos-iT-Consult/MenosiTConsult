@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import useStudentPortalData from '../useStudentPortalData';
+import { getNextClass } from '../../../../lib/academy-portal';
 
 function formatDate(value) {
   if (!value) return 'Date to be announced';
@@ -44,6 +45,7 @@ export default function StudentDashboardPage() {
   const upcomingExams = exams
     .filter((exam) => exam.date && new Date(`${exam.date}T00:00:00`) >= new Date(new Date().toDateString()))
     .slice(0, 3);
+  const nextClass = getNextClass(data.timetable || []);
 
   return (
     <main className="ap-main">
@@ -82,9 +84,61 @@ export default function StudentDashboardPage() {
           <small>{currency(unpaidInvoices.reduce((sum, invoice) => sum + Number(invoice.amount || 0), 0))}</small>
           <Link href="/academy/fees">View fees</Link>
         </article>
+        <article className="ap-stat">
+          <span>Notifications</span>
+          <strong>{data.unreadNotificationCount || 0}</strong>
+          <Link href="/academy/notifications">View notifications</Link>
+        </article>
       </section>
 
       <div className="ap-grid-2 ap-dashboard-sections">
+        <section className="ap-card">
+          <div className="ap-card-heading">
+            <h2>Next class</h2>
+            <Link href="/academy/timetable">Full timetable</Link>
+          </div>
+          {nextClass ? (
+            <div className="ap-next-class">
+              <span className="ap-chip ap-chip-active">{nextClass.dayLabel} · {nextClass.start_time}</span>
+              <strong>{nextClass.course_title || 'Class session'}</strong>
+              <p>{nextClass.venue || 'Venue to be announced'} · {nextClass.session_name || 'Current session'}</p>
+            </div>
+          ) : <p className="ap-muted">No class sessions have been scheduled.</p>}
+        </section>
+
+        <section className="ap-card">
+          <div className="ap-card-heading">
+            <h2>Course progress</h2>
+            <Link href="/academy/courses">All courses</Link>
+          </div>
+          {(data.courseProgress || []).length ? (
+            <div className="ap-progress-list">
+              {data.courseProgress.slice(0, 4).map((course) => (
+                <div key={course.courseId} className="ap-dashboard-progress">
+                  <div className="ap-card-heading">
+                    <strong>{course.courseTitle}</strong>
+                    <span>{course.percentage}%</span>
+                  </div>
+                  <div
+                    className="ap-progress-track"
+                    role="progressbar"
+                    aria-label={`${course.courseTitle} progress`}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={course.percentage}
+                  >
+                    <span style={{ width: `${course.percentage}%` }} />
+                  </div>
+                  <small>
+                    {course.completed} of {course.total} lessons complete
+                    {course.nextLesson ? ` · Next: ${course.nextLesson.title}` : ' · Course complete'}
+                  </small>
+                </div>
+              ))}
+            </div>
+          ) : <p className="ap-muted">Lesson progress will appear once instructors publish lessons for your courses.</p>}
+        </section>
+
         <section className="ap-card">
           <div className="ap-card-heading">
             <h2>Upcoming assignments</h2>
@@ -155,6 +209,28 @@ export default function StudentDashboardPage() {
 
         <section className="ap-card">
           <div className="ap-card-heading">
+            <h2>Recent notifications</h2>
+            <Link href="/academy/notifications">View all</Link>
+          </div>
+          {(data.notifications || []).length ? (
+            <ul className="ap-list">
+              {data.notifications.slice(0, 3).map((notification) => (
+                <li key={notification.id} className="ap-list-row ap-announcement">
+                  <div>
+                    <strong>{notification.title}</strong>
+                    <p>{notification.message}</p>
+                    <small>{formatDate(notification.createdAt)}</small>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="ap-muted">There are no notifications right now.</p>
+          )}
+        </section>
+
+        <section className="ap-card">
+          <div className="ap-card-heading">
             <h2>Academy announcements</h2>
             <Link href="/academy/timetable">View schedule</Link>
           </div>
@@ -170,9 +246,7 @@ export default function StudentDashboardPage() {
                 </li>
               ))}
             </ul>
-          ) : (
-            <p className="ap-muted">There are no announcements right now.</p>
-          )}
+          ) : <p className="ap-muted">There are no announcements right now.</p>}
         </section>
       </div>
     </main>

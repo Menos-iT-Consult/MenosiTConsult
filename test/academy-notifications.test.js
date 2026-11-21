@@ -8,6 +8,7 @@ const { sendAcademyNotificationEmail } = require('../backend/mailer');
 
 test('attempts and logs both channels when one notification provider fails', async () => {
   const logEntries = [];
+  const portalNotifications = [];
   const student = { id: 'student-1', email: 'learner@example.test', phone: '0241234567' };
   const result = await sendStudentNotification(student, {
     type: 'test_event',
@@ -22,6 +23,7 @@ test('attempts and logs both channels when one notification provider fails', asy
     },
     smsSender: async () => { throw new Error('SMS provider unavailable.'); },
     log: async (entry) => logEntries.push(entry),
+    portalLog: async (entry) => portalNotifications.push(entry),
   });
 
   assert.deepEqual(result, {
@@ -33,6 +35,13 @@ test('attempts and logs both channels when one notification provider fails', asy
     { channel: 'email', status: 'sent' },
     { channel: 'sms', status: 'failed' },
   ]);
+  assert.deepEqual(portalNotifications, [{
+    studentId: student.id,
+    type: 'test_event',
+    title: 'Test',
+    message: 'A short Academy notification.',
+    metadata: null,
+  }]);
 });
 
 test('sends Academy notifications through the Academy SMTP transport', async () => {
@@ -70,6 +79,7 @@ test('can retry one failed channel without resending the successful channel', as
     },
     smsSender: async () => ({ ok: true }),
     log: async (entry) => logged.push(entry),
+    portalLog: async () => {},
   });
 
   assert.equal(result.email.skipped, true);

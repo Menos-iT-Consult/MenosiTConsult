@@ -2101,6 +2101,84 @@ async function listInstructorLessonPlans(staffId, courseId) {
   return rows.map(mapLessonPlan);
 }
 
+async function listStudentLessons(studentId, { courseId } = {}) {
+  const params = [studentId];
+  if (courseId) params.push(courseId);
+  const { rows } = await q(
+    `SELECT p.id, p.course_id, p.session_id, p.lesson_date, p.title,
+            p.objectives, p.notes, p.resources, c.code AS course_code,
+            c.title AS course_title, s.name AS session_name,
+            (progress.lesson_plan_id IS NOT NULL) AS completed,
+            progress.completed_at
+       FROM academy_lesson_plans p
+       JOIN academy_courses c ON c.id = p.course_id
+       LEFT JOIN academy_sessions s ON s.id = p.session_id
+       LEFT JOIN academy_student_lesson_progress progress
+         ON progress.student_id = $1 AND progress.lesson_plan_id = p.id
+      WHERE EXISTS (
+        SELECT 1 FROM academy_enrollments e
+         WHERE e.student_id = $1 AND e.course_id = p.course_id
+           AND (p.session_id IS NULL OR e.session_id = p.session_id)
+           AND e.status IN ('enrolled', 'active')
+      )
+      ${courseId ? 'AND p.course_id = $2' : ''}
+      ORDER BY p.lesson_date NULLS LAST, p.created_at, p.title`,
+    params
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    courseId: row.course_id,
+    sessionId: row.session_id,
+    lessonDate: dateOnly(row.lesson_date),
+    title: row.title || 'Lesson',
+    objectives: row.objectives || '',
+    notes: row.notes || '',
+    resources: row.resources || '',
+    courseCode: row.course_code || '',
+    courseTitle: row.course_title || '',
+    sessionName: row.session_name || '',
+    completed: !!row.completed,
+    completedAt: row.completed_at ? iso(row.completed_at) : null,
+  }));
+}
+
+async function setStudentLessonProgress(studentId, lessonId, completed) {
+  if (!completed) {
+    const { rows: eligible } = await q(
+      `SELECT lesson.id FROM academy_lesson_plans lesson
+        WHERE lesson.id = $2 AND EXISTS (
+          SELECT 1 FROM academy_enrollments enrollment
+           WHERE enrollment.student_id = $1 AND enrollment.course_id = lesson.course_id
+             AND (lesson.session_id IS NULL OR enrollment.session_id = lesson.session_id)
+             AND enrollment.status IN ('enrolled', 'active')
+        )`,
+      [studentId, lessonId]
+    );
+    if (!eligible.length) return false;
+    await q(
+      `DELETE FROM academy_student_lesson_progress
+        WHERE student_id = $1 AND lesson_plan_id = $2`,
+      [studentId, lessonId]
+    );
+    return true;
+  }
+  const { rows } = await q(
+    `INSERT INTO academy_student_lesson_progress (student_id, lesson_plan_id)
+     SELECT $1, lesson.id
+       FROM academy_lesson_plans lesson
+       JOIN academy_enrollments enrollment
+         ON enrollment.student_id = $1 AND enrollment.course_id = lesson.course_id
+        AND (lesson.session_id IS NULL OR enrollment.session_id = lesson.session_id)
+        AND enrollment.status IN ('enrolled', 'active')
+      WHERE lesson.id = $2
+     ON CONFLICT (student_id, lesson_plan_id)
+     DO UPDATE SET completed_at = now()
+     RETURNING lesson_plan_id, completed_at`,
+    [studentId, lessonId]
+  );
+  return rows[0] ? { lessonId: rows[0].lesson_plan_id, completedAt: iso(rows[0].completed_at) } : null;
+}
+
 async function createInstructorLessonPlan(staffId, plan) {
   const { rows } = await q(
     `INSERT INTO academy_lesson_plans
@@ -2426,6 +2504,137 @@ async function deleteInvoice(id) {
   await q('DELETE FROM academy_invoices WHERE id = $1', [id]);
 }
 
+async function listStudentPayments(studentId) {
+  const [submissions, payments] = await Promise.all([
+    q(
+      `SELECT submission.*, invoice.title AS invoice_title,
+              invoice.amount AS invoice_amount, invoice.due_date
+         FROM academy_payment_submissions submission
+         JOIN academy_invoices invoice ON invoice.id = submission.invoice_id
+        WHERE submission.student_id = $1
+        ORDER BY submission.submitted_at DESC`,
+      [studentId]
+    ),
+    q(
+      `SELECT payment.id, payment.invoice_id, payment.amount, payment.method,
+              payment.reference, payment.note, payment.paid_at,
+              invoice.title AS invoice_title
+         FROM academy_payments payment
+         JOIN academy_invoices invoice ON invoice.id = payment.invoice_id
+        WHERE payment.student_id = $1
+        ORDER BY payment.paid_at DESC`,
+      [studentId]
+    ),
+  ]);
+  return {
+    submissions: submissions.rows,
+    payments: payments.rows,
+  };
+}
+
+async function createStudentPaymentSubmission(studentId, { invoiceId, method, reference, note }) {
+  const { rows } = await q(
+    `INSERT INTO academy_payment_submissions
+      (id, student_id, invoice_id, method, reference, note)
+     SELECT $1, invoice.student_id, invoice.id, $3, $4, $5
+       FROM academy_invoices invoice
+      WHERE invoice.id = $2 AND invoice.student_id = $6 AND invoice.paid = false
+     RETURNING *`,
+    [newId('acps'), invoiceId, method, reference, note || '', studentId]
+  );
+  return rows[0] || null;
+}
+
+async function listAdminPaymentSubmissions(status = 'pending') {
+  const params = [];
+  const statusFilter = status ? 'WHERE submission.status = $1' : '';
+  if (status) params.push(status);
+  const { rows } = await q(
+    `SELECT submission.*, invoice.title AS invoice_title,
+            invoice.amount AS invoice_amount, invoice.due_date,
+            student.student_id AS student_number, student.first_name,
+            student.middle_name, student.last_name, student.email, student.phone
+       FROM academy_payment_submissions submission
+       JOIN academy_invoices invoice ON invoice.id = submission.invoice_id
+       JOIN academy_students student ON student.id = submission.student_id
+       ${statusFilter}
+      ORDER BY submission.submitted_at DESC
+      LIMIT 500`,
+    params
+  );
+  return rows;
+}
+
+async function reviewStudentPaymentSubmission(id, reviewerId, { approve, reviewNote = '' }) {
+  return transaction(async (client) => {
+    const { rows } = await client.query(
+      `SELECT * FROM academy_payment_submissions WHERE id = $1 FOR UPDATE`,
+      [id]
+    );
+    const submission = rows[0];
+    if (!submission) return null;
+    if (submission.status !== 'pending') {
+      const error = new Error('This payment submission has already been reviewed.');
+      error.code = 'PAYMENT_SUBMISSION_REVIEWED';
+      throw error;
+    }
+
+    if (approve) {
+      const { rows: invoices } = await client.query(
+        'SELECT * FROM academy_invoices WHERE id = $1 AND student_id = $2 FOR UPDATE',
+        [submission.invoice_id, submission.student_id]
+      );
+      const invoice = invoices[0];
+      if (!invoice || invoice.paid) {
+        const error = new Error('The invoice is no longer available for payment.');
+        error.code = 'INVOICE_ALREADY_PAID';
+        throw error;
+      }
+      await client.query(
+        `INSERT INTO academy_payments
+          (id, student_id, invoice_id, amount, method, reference, note, recorded_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [
+          newId('acpy'), submission.student_id, submission.invoice_id,
+          invoice.amount, submission.method, submission.reference,
+          submission.note || null, reviewerId,
+        ]
+      );
+      await client.query(
+        `UPDATE academy_invoices SET paid = true, status = 'paid' WHERE id = $1`,
+        [submission.invoice_id]
+      );
+    }
+
+    const { rows: updated } = await client.query(
+      `UPDATE academy_payment_submissions
+          SET status = $2, review_note = $3, reviewed_by = $4, reviewed_at = now()
+        WHERE id = $1 RETURNING *`,
+      [id, approve ? 'approved' : 'rejected', reviewNote, reviewerId]
+    );
+    return updated[0];
+  });
+}
+
+async function getStudentPaymentReceipt(studentId, paymentId) {
+  const { rows } = await q(
+    `SELECT payment.id, payment.amount, payment.method, payment.reference,
+            payment.note, payment.paid_at, invoice.title AS invoice_title,
+            invoice.session_id, session.name AS session_name,
+            student.student_id AS student_number, student.first_name,
+            student.middle_name, student.last_name, student.email,
+            program.name AS program_name
+       FROM academy_payments payment
+       JOIN academy_invoices invoice ON invoice.id = payment.invoice_id
+       JOIN academy_students student ON student.id = payment.student_id
+       LEFT JOIN academy_sessions session ON session.id = invoice.session_id
+       LEFT JOIN academy_programs program ON program.id = student.program_id
+      WHERE payment.id = $1 AND payment.student_id = $2`,
+    [paymentId, studentId]
+  );
+  return rows[0] || null;
+}
+
 // ── notifications log (audit of every email/SMS sent to a student) ──────────
 async function logNotification(n) {
   const { rows } = await q(
@@ -2439,6 +2648,223 @@ async function logNotification(n) {
     ]
   );
   return mapNotification(rows[0]);
+}
+
+async function createStudentPortalNotification({ studentId, type, title, message, metadata }) {
+  const { rows } = await q(
+    `INSERT INTO academy_student_notifications
+      (id, student_id, type, title, message, metadata)
+     VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+    [
+      newId('apn'), studentId, type, title, message,
+      metadata ? JSON.stringify(metadata) : null,
+    ]
+  );
+  return mapStudentPortalNotification(rows[0]);
+}
+
+async function countUnreadStudentPortalNotifications(studentId) {
+  const { rows } = await q(
+    `SELECT COUNT(*) AS unread_count
+       FROM academy_student_notifications
+      WHERE student_id = $1 AND is_read = false`,
+    [studentId]
+  );
+  return Number(rows[0]?.unread_count) || 0;
+}
+
+function mapStudentPortalNotification(row) {
+  let metadata = row.metadata;
+  if (typeof metadata === 'string') {
+    try { metadata = JSON.parse(metadata); } catch { metadata = null; }
+  }
+  return {
+    id: row.id,
+    type: row.type,
+    title: row.title,
+    message: row.message,
+    metadata: metadata || null,
+    isRead: !!row.is_read,
+    createdAt: iso(row.created_at),
+  };
+}
+
+async function listStudentPortalNotifications(studentId, limit = 100) {
+  const { rows } = await q(
+    `SELECT * FROM academy_student_notifications
+      WHERE student_id = $1 ORDER BY created_at DESC LIMIT $2`,
+    [studentId, Math.max(1, Math.min(Number(limit) || 100, 200))]
+  );
+  return rows.map(mapStudentPortalNotification);
+}
+
+async function markStudentPortalNotificationRead(studentId, { id, all = false }) {
+  if (all) {
+    const { rowCount } = await q(
+      `UPDATE academy_student_notifications SET is_read = true
+        WHERE student_id = $1 AND is_read = false`,
+      [studentId]
+    );
+    return rowCount;
+  }
+  const { rows } = await q(
+    `UPDATE academy_student_notifications SET is_read = true
+      WHERE student_id = $1 AND id = $2 RETURNING *`,
+    [studentId, id]
+  );
+  return rows[0] ? mapStudentPortalNotification(rows[0]) : null;
+}
+
+function mapSupportMessage(row) {
+  return {
+    id: row.id,
+    ticketId: row.ticket_id,
+    senderId: row.sender_id,
+    senderRole: row.sender_role,
+    message: row.message,
+    createdAt: iso(row.created_at),
+  };
+}
+
+async function getSupportMessages(ticketIds) {
+  const { rows } = await q(
+    `SELECT * FROM academy_support_messages
+      WHERE ticket_id = ANY($1::text[]) ORDER BY created_at`,
+    [ticketIds]
+  );
+  return rows.map(mapSupportMessage);
+}
+
+async function listStudentSupportTickets(studentId) {
+  const { rows } = await q(
+    `SELECT * FROM academy_support_tickets
+      WHERE student_id = $1 ORDER BY updated_at DESC`,
+    [studentId]
+  );
+  const messages = await getSupportMessages(rows.map((ticket) => ticket.id));
+  const grouped = new Map();
+  for (const message of messages) {
+    if (!grouped.has(message.ticketId)) grouped.set(message.ticketId, []);
+    grouped.get(message.ticketId).push(message);
+  }
+  return rows.map((row) => ({
+    id: row.id,
+    subject: row.subject,
+    status: row.status,
+    createdAt: iso(row.created_at),
+    updatedAt: iso(row.updated_at),
+    messages: grouped.get(row.id) || [],
+  }));
+}
+
+async function listAdminSupportTickets(status = '') {
+  const params = [];
+  const statusFilter = status ? 'WHERE ticket.status = $1' : '';
+  if (status) params.push(status);
+  const { rows } = await q(
+    `SELECT ticket.*, student.student_id AS student_number,
+            student.first_name, student.middle_name, student.last_name,
+            student.email
+       FROM academy_support_tickets ticket
+       JOIN academy_students student ON student.id = ticket.student_id
+       ${statusFilter}
+      ORDER BY CASE ticket.status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 ELSE 2 END,
+               ticket.updated_at DESC
+      LIMIT 500`,
+    params
+  );
+  const messages = await getSupportMessages(rows.map((ticket) => ticket.id));
+  const grouped = new Map();
+  for (const message of messages) {
+    if (!grouped.has(message.ticketId)) grouped.set(message.ticketId, []);
+    grouped.get(message.ticketId).push(message);
+  }
+  return rows.map((row) => ({
+    id: row.id,
+    studentId: row.student_id,
+    studentNumber: row.student_number || '',
+    studentName: [row.first_name, row.middle_name, row.last_name].filter(Boolean).join(' '),
+    studentEmail: row.email || '',
+    subject: row.subject,
+    status: row.status,
+    createdAt: iso(row.created_at),
+    updatedAt: iso(row.updated_at),
+    messages: grouped.get(row.id) || [],
+  }));
+}
+
+async function createStudentSupportTicket(studentId, { subject, message }) {
+  return transaction(async (client) => {
+    const ticketId = newId('atkt');
+    const { rows } = await client.query(
+      `INSERT INTO academy_support_tickets (id, student_id, subject)
+       VALUES ($1,$2,$3) RETURNING *`,
+      [ticketId, studentId, subject]
+    );
+    const { rows: messages } = await client.query(
+      `INSERT INTO academy_support_messages
+        (id, ticket_id, sender_id, sender_role, message)
+       VALUES ($1,$2,$3,'student',$4) RETURNING *`,
+      [newId('atkm'), ticketId, studentId, message]
+    );
+    return {
+      id: rows[0].id,
+      subject: rows[0].subject,
+      status: rows[0].status,
+      createdAt: iso(rows[0].created_at),
+      updatedAt: iso(rows[0].updated_at),
+      messages: [mapSupportMessage(messages[0])],
+    };
+  });
+}
+
+async function addSupportMessage({ ticketId, senderId, senderRole, message }) {
+  return transaction(async (client) => {
+    const { rows: tickets } = await client.query(
+      `SELECT * FROM academy_support_tickets
+        WHERE id = $1 ${senderRole === 'student' ? 'AND student_id = $2' : ''}
+        FOR UPDATE`,
+      senderRole === 'student' ? [ticketId, senderId] : [ticketId]
+    );
+    const ticket = tickets[0];
+    if (!ticket) return null;
+    if (ticket.status === 'resolved' && senderRole === 'admin') {
+      const error = new Error('Resolved support tickets cannot be replied to.');
+      error.code = 'SUPPORT_TICKET_RESOLVED';
+      throw error;
+    }
+    const { rows } = await client.query(
+      `INSERT INTO academy_support_messages
+        (id, ticket_id, sender_id, sender_role, message)
+       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [newId('atkm'), ticketId, senderId, senderRole, message]
+    );
+    await client.query(
+      `UPDATE academy_support_tickets
+          SET status = CASE WHEN $2 = 'student' AND status = 'resolved'
+                            THEN 'open'
+                            WHEN $2 = 'admin' AND status = 'open'
+                            THEN 'in_progress' ELSE status END,
+              updated_at = now()
+        WHERE id = $1`,
+      [ticketId, senderRole]
+    );
+    return {
+      ...mapSupportMessage(rows[0]),
+      studentId: ticket.student_id,
+      subject: ticket.subject,
+    };
+  });
+}
+
+async function updateAdminSupportTicketStatus(ticketId, status) {
+  const { rows } = await q(
+    `UPDATE academy_support_tickets
+        SET status = $2, updated_at = now()
+      WHERE id = $1 RETURNING *`,
+    [ticketId, status]
+  );
+  return rows[0] || null;
 }
 
 async function listNotifications(studentId) {
@@ -2650,6 +3076,130 @@ async function seedAcademy(log = () => {}) {
   }
 }
 
+async function getAcademyAdminReports(sessionId = '') {
+ const [summaryResult, coursesResult, studentsResult] = await Promise.all([
+   q(
+     `SELECT
+        (SELECT COUNT(*) FROM academy_students WHERE status = 'active') AS active_students,
+        (SELECT COUNT(DISTINCT enrollment.student_id)
+           FROM academy_enrollments enrollment
+          WHERE enrollment.status IN ('enrolled', 'active')
+            AND ($1 = '' OR enrollment.session_id = $1)) AS enrolled_students,
+        (SELECT COUNT(DISTINCT course.id)
+           FROM academy_courses course
+           JOIN academy_enrollments enrollment ON enrollment.course_id = course.id
+          WHERE enrollment.status IN ('enrolled', 'active')
+            AND ($1 = '' OR enrollment.session_id = $1)) AS active_courses,
+        (SELECT ROUND(AVG(grade.total)::numeric, 1)
+           FROM academy_grades grade
+           JOIN academy_enrollments enrollment ON enrollment.id = grade.enrollment_id
+          WHERE enrollment.status IN ('enrolled', 'active')
+            AND ($1 = '' OR enrollment.session_id = $1)) AS average_grade,
+        (SELECT COUNT(*) FROM academy_attendance attendance
+          WHERE $1 = '' OR attendance.session_id = $1) AS attendance_records,
+        (SELECT COUNT(*) FROM academy_attendance attendance
+          WHERE attendance.status = 'present'
+            AND ($1 = '' OR attendance.session_id = $1)) AS present_records,
+        (SELECT COALESCE(SUM(invoice.amount), 0) FROM academy_invoices invoice
+          WHERE invoice.paid = true AND ($1 = '' OR invoice.session_id = $1)) AS paid_fees,
+        (SELECT COALESCE(SUM(invoice.amount), 0) FROM academy_invoices invoice
+          WHERE invoice.paid = false AND ($1 = '' OR invoice.session_id = $1)) AS outstanding_fees,
+        (SELECT COUNT(*) FROM academy_payment_submissions submission
+          JOIN academy_invoices invoice ON invoice.id = submission.invoice_id
+          WHERE submission.status = 'pending'
+            AND ($1 = '' OR invoice.session_id = $1)) AS pending_payments,
+        (SELECT COUNT(*) FROM academy_support_tickets
+          WHERE status IN ('open', 'in_progress')) AS open_support_tickets,
+        (SELECT COUNT(*) FROM academy_student_scholarships) AS awarded_scholarships`,
+     [sessionId]
+   ),
+   q(
+     `SELECT course.id, course.code, course.title,
+             (SELECT COUNT(DISTINCT enrollment.student_id)
+                FROM academy_enrollments enrollment
+               WHERE enrollment.course_id = course.id
+                 AND enrollment.status IN ('enrolled', 'active')
+                 AND ($1 = '' OR enrollment.session_id = $1)) AS enrollment_count,
+             (SELECT ROUND(AVG(grade.total)::numeric, 1)
+                FROM academy_grades grade
+                JOIN academy_enrollments enrollment ON enrollment.id = grade.enrollment_id
+               WHERE enrollment.course_id = course.id
+                 AND enrollment.status IN ('enrolled', 'active')
+                 AND ($1 = '' OR enrollment.session_id = $1)) AS average_grade,
+             (SELECT COUNT(*)
+                FROM academy_attendance attendance
+               WHERE attendance.course_id = course.id
+                 AND ($1 = '' OR attendance.session_id = $1)) AS attendance_count,
+             (SELECT COUNT(*)
+                FROM academy_attendance attendance
+               WHERE attendance.course_id = course.id
+                 AND attendance.status = 'present'
+                 AND ($1 = '' OR attendance.session_id = $1)) AS present_count
+        FROM academy_courses course
+       ORDER BY course.title`,
+     [sessionId]
+   ),
+   q(
+     `SELECT student.id, student.student_id, student.first_name,
+             student.middle_name, student.last_name, student.email,
+             program.name AS program_name,
+             COALESCE(enrollment_stats.course_count, 0) AS course_count,
+             enrollment_stats.average_grade,
+             COALESCE(attendance_stats.attendance_count, 0) AS attendance_count,
+             COALESCE(attendance_stats.present_count, 0) AS present_count,
+             COALESCE(invoice_stats.outstanding_amount, 0) AS outstanding_amount
+        FROM academy_students student
+        LEFT JOIN academy_programs program ON program.id = student.program_id
+        LEFT JOIN LATERAL (
+          SELECT COUNT(DISTINCT enrollment.course_id) AS course_count,
+                 ROUND(AVG(grade.total)::numeric, 1) AS average_grade
+            FROM academy_enrollments enrollment
+            LEFT JOIN academy_grades grade ON grade.enrollment_id = enrollment.id
+           WHERE enrollment.student_id = student.id
+             AND enrollment.status IN ('enrolled', 'active')
+             AND ($1 = '' OR enrollment.session_id = $1)
+        ) enrollment_stats ON true
+        LEFT JOIN LATERAL (
+          SELECT COUNT(*) AS attendance_count,
+                 COUNT(*) FILTER (WHERE attendance.status = 'present') AS present_count
+            FROM academy_attendance attendance
+           WHERE attendance.student_id = student.id
+             AND ($1 = '' OR attendance.session_id = $1)
+        ) attendance_stats ON true
+        LEFT JOIN LATERAL (
+          SELECT COALESCE(SUM(invoice.amount), 0) AS outstanding_amount
+            FROM academy_invoices invoice
+           WHERE invoice.student_id = student.id AND invoice.paid = false
+             AND ($1 = '' OR invoice.session_id = $1)
+        ) invoice_stats ON true
+       WHERE student.status = 'active'
+       ORDER BY student.last_name, student.first_name`,
+     [sessionId]
+   ),
+ ]);
+ const summary = summaryResult.rows[0] || {};
+ return {
+   summary: Object.fromEntries(
+     Object.entries(summary).map(([key, value]) => [key, value == null ? 0 : Number(value)])
+   ),
+   courses: coursesResult.rows.map((row) => ({
+     ...row,
+     enrollment_count: Number(row.enrollment_count) || 0,
+     average_grade: row.average_grade == null ? null : Number(row.average_grade),
+     attendance_count: Number(row.attendance_count) || 0,
+     present_count: Number(row.present_count) || 0,
+   })),
+   students: studentsResult.rows.map((row) => ({
+     ...row,
+     course_count: Number(row.course_count) || 0,
+     average_grade: row.average_grade == null ? null : Number(row.average_grade),
+     attendance_count: Number(row.attendance_count) || 0,
+     present_count: Number(row.present_count) || 0,
+     outstanding_amount: Number(row.outstanding_amount) || 0,
+   })),
+ };
+}
+
 module.exports = {
   q,
   ensureAcademyReady,
@@ -2688,7 +3238,7 @@ module.exports = {
   listInstructorCourseProgress,
   // instructor attendance and lesson plans
   listStudentAttendance, listInstructorAttendance, saveInstructorAttendance,
-  listInstructorLessonPlans, createInstructorLessonPlan,
+  listInstructorLessonPlans, listStudentLessons, setStudentLessonProgress, createInstructorLessonPlan,
   updateInstructorLessonPlan, deleteInstructorLessonPlan,
   // timetable
   listTimetable, getTimetable, createTimetable, updateTimetable, deleteTimetable,
@@ -2696,8 +3246,17 @@ module.exports = {
   listExams, getExam, createExam, updateExam, deleteExam,
   // invoices
   listInvoices, getInvoice, createInvoice, updateInvoice, deleteInvoice,
+  listStudentPayments, createStudentPaymentSubmission,
+  listAdminPaymentSubmissions, reviewStudentPaymentSubmission, getStudentPaymentReceipt,
   // notifications
   logNotification, listNotifications, getNotificationStatuses,
+  createStudentPortalNotification, listStudentPortalNotifications,
+  countUnreadStudentPortalNotifications, markStudentPortalNotificationRead,
+  // student support
+  listStudentSupportTickets, listAdminSupportTickets,
+  createStudentSupportTicket, addSupportMessage, updateAdminSupportTicketStatus,
+  // administrator reports
+  getAcademyAdminReports,
   listInvoiceReminderCandidates, listAssignmentReminderCandidates,
   listFailedAdmissionSms, listAnnouncements, createAnnouncement,
   // certificates and settings

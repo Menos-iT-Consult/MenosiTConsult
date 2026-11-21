@@ -216,6 +216,60 @@ async function ensureAcademySchema(query) {
     created_at timestamptz DEFAULT now(),
     updated_at timestamptz DEFAULT now()
   );`);
+  await query(`CREATE TABLE IF NOT EXISTS academy_student_lesson_progress (
+    student_id text NOT NULL REFERENCES academy_students(id) ON DELETE CASCADE,
+    lesson_plan_id text NOT NULL REFERENCES academy_lesson_plans(id) ON DELETE CASCADE,
+    completed_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (student_id, lesson_plan_id)
+  );`);
+  await query(`CREATE TABLE IF NOT EXISTS academy_student_notifications (
+    id text PRIMARY KEY,
+    student_id text NOT NULL REFERENCES academy_students(id) ON DELETE CASCADE,
+    type text NOT NULL,
+    title text NOT NULL,
+    message text NOT NULL,
+    metadata jsonb,
+    is_read boolean NOT NULL DEFAULT false,
+    created_at timestamptz NOT NULL DEFAULT now()
+  );`);
+  await query(`CREATE INDEX IF NOT EXISTS academy_student_notifications_feed
+    ON academy_student_notifications (student_id, created_at DESC);`);
+  await query(`CREATE TABLE IF NOT EXISTS academy_support_tickets (
+    id text PRIMARY KEY,
+    student_id text NOT NULL REFERENCES academy_students(id) ON DELETE CASCADE,
+    subject text NOT NULL,
+    status text NOT NULL DEFAULT 'open'
+      CHECK (status IN ('open', 'in_progress', 'resolved')),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+  );`);
+  await query(`CREATE TABLE IF NOT EXISTS academy_support_messages (
+    id text PRIMARY KEY,
+    ticket_id text NOT NULL REFERENCES academy_support_tickets(id) ON DELETE CASCADE,
+    sender_id text NOT NULL,
+    sender_role text NOT NULL CHECK (sender_role IN ('student', 'admin')),
+    message text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+  );`);
+  await query(`CREATE INDEX IF NOT EXISTS academy_support_tickets_updated
+    ON academy_support_tickets (status, updated_at DESC);`);
+  await query(`CREATE TABLE IF NOT EXISTS academy_payment_submissions (
+    id text PRIMARY KEY,
+    student_id text NOT NULL REFERENCES academy_students(id) ON DELETE CASCADE,
+    invoice_id text NOT NULL REFERENCES academy_invoices(id) ON DELETE CASCADE,
+    method text NOT NULL,
+    reference text NOT NULL,
+    note text NOT NULL DEFAULT '',
+    status text NOT NULL DEFAULT 'pending'
+      CHECK (status IN ('pending', 'approved', 'rejected')),
+    review_note text NOT NULL DEFAULT '',
+    reviewed_by text,
+    submitted_at timestamptz NOT NULL DEFAULT now(),
+    reviewed_at timestamptz
+  );`);
+  await query(`CREATE UNIQUE INDEX IF NOT EXISTS academy_payment_one_pending_per_invoice
+    ON academy_payment_submissions (invoice_id)
+    WHERE status = 'pending';`);
   await query(`CREATE TABLE IF NOT EXISTS academy_notifications (
     id text PRIMARY KEY,
     student_id text,
