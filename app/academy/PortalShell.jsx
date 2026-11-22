@@ -56,6 +56,8 @@ const PORTALS = {
     login: '/instructor/login',
     links: [
       { href: '/instructor/dashboard', label: 'Dashboard', icon: 'dashboard' },
+      { href: '/instructor/dashboard#teaching-tools', label: 'Teaching tools', icon: 'assignments' },
+      { href: '/instructor/dashboard#needs-review', label: 'Needs review', icon: 'reports' },
       { href: '/instructor/dashboard#my-courses', label: 'My courses', icon: 'courses' },
       { href: '/instructor/dashboard#upcoming-deadlines', label: 'Deadlines', icon: 'assignments' },
     ],

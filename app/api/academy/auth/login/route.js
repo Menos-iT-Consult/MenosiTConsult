@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 
-const bcrypt = require('bcryptjs');
 const academy = require('../../../../../backend/academy-db');
 const auth = require('../../../../../lib/academy-auth');
+const { verifyAcademyPassword } = require('../../../../../lib/academy-password');
+const {
+  createStudentLoginRateLimitKeys,
+  getClientIp,
+} = require('../../../../../lib/academy-login-rate-limit');
 const { noDbErrorResponse } = require('../../../../../lib/api-helpers');
 
 // Student portal login. The username is the Student ID issued at admission
@@ -13,11 +17,35 @@ export async function POST(request) {
   const studentId = String(body.studentId || body.username || '').trim().toUpperCase();
   const password = String(body.password || '');
 
-  if (!studentId || !password) {
-    return NextResponse.json({ error: 'Student ID and password are required.' }, { status: 400 });
+  if (!studentId || studentId.length > 120 || !password || password.length > 200) {
+    return NextResponse.json(
+      { error: 'Student ID and password are required and must be within the allowed length.' },
+      { status: 400 }
+    );
   }
 
   try {
+    if (!process.env.SESSION_SECRET) {
+      return NextResponse.json(
+        { error: 'Student sign-in is temporarily unavailable.' },
+        { status: 503 }
+      );
+    }
+
+    const rateLimitKeys = createStudentLoginRateLimitKeys({
+      studentId,
+      clientIp: getClientIp(request),
+      secret: process.env.SESSION_SECRET,
+    });
+    const rateLimit = await academy.reserveAcademyLoginAttempts(rateLimitKeys);
+    if (!rateLimit.allowed) {
+      const minutes = Math.max(1, Math.ceil(rateLimit.retryAfterSeconds / 60));
+      return NextResponse.json(
+        { error: `Too many sign-in attempts. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.` },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } }
+      );
+    }
+
     const creds = await academy.getStudentAuthByStudentId(studentId);
     if (!creds || creds.status === 'pending') {
       return NextResponse.json(
@@ -31,7 +59,7 @@ export async function POST(request) {
         { status: 403 }
       );
     }
-    if (!creds.passwordHash || !bcrypt.compare(password, creds.passwordHash)) {
+    if (!await verifyAcademyPassword(password, creds.passwordHash)) {
       return NextResponse.json({ error: 'Invalid Student ID or password.' }, { status: 401 });
     }
 
@@ -40,6 +68,7 @@ export async function POST(request) {
       mustChangePassword: creds.mustChangePassword,
     });
     auth.setAcademyCookie(response, auth.STUDENT_COOKIE, creds.id, auth.STUDENT_MAX_AGE);
+    await academy.clearAcademyLoginAttempts(rateLimitKeys);
     return response;
   } catch (err) {
     const noDb = noDbErrorResponse(err);

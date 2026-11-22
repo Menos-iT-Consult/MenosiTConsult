@@ -7,6 +7,13 @@ import InstructorQuizManager from '../InstructorQuizManager';
 import InstructorLessonMaterials from '../InstructorLessonMaterials';
 
 const TABS = ['Overview', 'Assignments', 'Quizzes', 'Gradebook', 'Attendance', 'Lessons & content'];
+const TOOL_TABS = {
+  assignments: 'Assignments',
+  quizzes: 'Quizzes',
+  gradebook: 'Gradebook',
+  attendance: 'Attendance',
+  lessons: 'Lessons & content',
+};
 const ATTENDANCE_STATUSES = [
   ['present', 'Present'],
   ['absent', 'Absent'],
@@ -55,6 +62,11 @@ export default function InstructorCoursePage() {
   const [saving, setSaving] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+
+  useEffect(() => {
+    const requestedTool = new URLSearchParams(window.location.search).get('tool');
+    if (requestedTool && TOOL_TABS[requestedTool]) setTab(TOOL_TABS[requestedTool]);
+  }, []);
 
   const loadWorkspace = useCallback(async () => {
     setLoading(true);

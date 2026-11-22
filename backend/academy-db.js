@@ -9,6 +9,7 @@ const { getAcademyDatabaseConfigError } = require('../lib/academy-db-config');
 const { isInstructorInvitationRedeemable } = require('../lib/academy-invitations');
 const academyBootstrapContext = new AsyncLocalStorage();
 let Pool;
+let lastLoginRateLimitCleanup = 0;
 
 try {
   ({ Pool } = require('pg'));
@@ -75,6 +76,67 @@ async function transaction(callback) {
   } finally {
     client.release();
   }
+}
+
+async function reserveAcademyLoginAttempts(keys) {
+  const now = Date.now();
+  if (now - lastLoginRateLimitCleanup > 60 * 60 * 1000) {
+    await q(`DELETE FROM academy_login_rate_limits
+      WHERE updated_at < now() - interval '24 hours'`);
+    lastLoginRateLimitCleanup = now;
+  }
+
+  let retryAfterSeconds = 0;
+  for (const { keyHash, limit, windowSeconds } of keys) {
+    const { rows } = await q(
+      `INSERT INTO academy_login_rate_limits
+        (key_hash, attempts, window_started_at, updated_at)
+       VALUES ($1, 1, now(), now())
+       ON CONFLICT (key_hash) DO UPDATE SET
+         attempts = CASE
+           WHEN academy_login_rate_limits.blocked_until > now()
+             THEN academy_login_rate_limits.attempts
+           WHEN academy_login_rate_limits.window_started_at <= now() - ($3 * interval '1 second')
+             THEN 1
+           ELSE academy_login_rate_limits.attempts + 1
+         END,
+         window_started_at = CASE
+           WHEN academy_login_rate_limits.blocked_until > now()
+             THEN academy_login_rate_limits.window_started_at
+           WHEN academy_login_rate_limits.window_started_at <= now() - ($3 * interval '1 second')
+             THEN now()
+           ELSE academy_login_rate_limits.window_started_at
+         END,
+         blocked_until = CASE
+           WHEN academy_login_rate_limits.blocked_until > now()
+             THEN academy_login_rate_limits.blocked_until
+           WHEN academy_login_rate_limits.window_started_at <= now() - ($3 * interval '1 second')
+             THEN NULL
+           WHEN academy_login_rate_limits.attempts + 1 > $2
+             THEN now() + ($3 * interval '1 second')
+           ELSE NULL
+         END,
+         updated_at = now()
+       RETURNING GREATEST(
+         CEIL(EXTRACT(EPOCH FROM (blocked_until - now()))),
+         0
+       )::int AS retry_after_seconds`,
+      [keyHash, limit, windowSeconds]
+    );
+    retryAfterSeconds = Math.max(retryAfterSeconds, Number(rows[0]?.retry_after_seconds) || 0);
+  }
+
+  return {
+    allowed: retryAfterSeconds === 0,
+    retryAfterSeconds,
+  };
+}
+
+async function clearAcademyLoginAttempts(keys) {
+  await q(
+    'DELETE FROM academy_login_rate_limits WHERE key_hash = ANY($1::text[])',
+    [keys.map(({ keyHash }) => keyHash)]
+  );
 }
 
 // ── row → camelCase mappers ──────────────────────────────────────────────────
@@ -3641,6 +3703,8 @@ async function getAcademyAdminReports(sessionId = '') {
 module.exports = {
   q,
   ensureAcademyReady,
+  reserveAcademyLoginAttempts,
+  clearAcademyLoginAttempts,
   newId,
   // students
   listStudents, listAdminStudents, getStudent, getStudentByStudentId, getStudentByEmail,

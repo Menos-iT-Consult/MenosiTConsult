@@ -61,77 +61,50 @@ function InstructorLoginPage() {
   };
 
   return (
-    <div style={{ padding: '2rem' }}>
-      <h2>Instructor Login</h2>
+    <main className="ap-auth">
+      <section className="ap-auth-card">
+        <header className="ap-auth-logo">
+          <img src="/assets/academy-logo-black.png" alt="MITA IT Academy" />
+          <h1>Instructor Login</h1>
+          <p>Sign in to your teaching workspace</p>
+        </header>
 
-      {error && <p style={{ color: 'red', marginBottom: '1rem' }}>{error}</p>}
+        {error && <div className="ap-error" role="alert">{error}</div>}
 
-      <form onSubmit={handleSubmit} style={{ maxWidth: '400px', margin: '0 auto' }}>
-        <div style={{ marginBottom: '1rem' }}>
-          <label htmlFor="email" style={{ display: 'block', marginBottom: '0.5rem' }}>
-            Email
-          </label>
+        <form onSubmit={handleSubmit} className="ap-login-form">
+          <label htmlFor="email">Email</label>
           <input
             id="email"
             name="email"
+            className="ap-input"
             type="email"
-            style={{
-              width: '100%',
-              padding: '10px',
-                border: '1px solid #ccc',
-                borderRadius: 8,
-                fontFamily: 'inherit',
-                fontSize: '1rem',
-            }}
+            autoComplete="username"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
           />
-        </div>
 
-        <div style={{ marginBottom: '1rem' }}>
-          <label htmlFor="password" style={{ display: 'block', marginBottom: '0.5rem' }}>
-            Password
-          </label>
+          <label htmlFor="password">Password</label>
           <PasswordInput
             id="password"
             name="password"
-            style={{
-              width: '100%',
-              padding: '10px',
-                border: '1px solid #ccc',
-                borderRadius: 8,
-                fontFamily: 'inherit',
-                fontSize: '1rem',
-            }}
+            className="ap-input"
+            autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
           />
-        </div>
 
-        <button
-          type="submit"
-          style={{
-            width: '100%',
-            padding: '10px',
-              background: 'var(--blue)',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 8,
-              fontWeight: 500,
-              cursor: 'pointer',
-          }}
-          disabled={loading}
-        >
-          {loading ? 'Logging in...' : 'Sign In'}
-        </button>
-      </form>
+          <button className="ap-button ap-button-primary" type="submit" disabled={loading}>
+            {loading ? 'Signing in…' : 'Sign in'}
+          </button>
+        </form>
 
-      <p style={{ marginTop: '1rem', fontSize: '.87rem', color: '#64748b' }}>
-        Instructor accounts are issued by Academy administrators. Use the setup link in your invitation email.
-      </p>
-    </div>
+        <p className="ap-auth-foot">
+          Instructor accounts are issued by Academy administrators. Use the setup link in your invitation email.
+        </p>
+      </section>
+    </main>
   );
 }
 

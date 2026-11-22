@@ -110,6 +110,10 @@ account, issues a Student ID, and sends that ID and its temporary password to
 the applicant by mNotify SMS. The student must change the password at first
 sign-in. Failed SMS deliveries are recorded and can be retried from the
 admissions page without approving the student again.
+Student sign-in allows five attempts per Student ID and 30 attempts per client
+IP in a 15-minute window; a successful sign-in clears the counters. Rate-limit
+state is stored in the Academy database so the limit applies across app
+instances.
 Administrators add and publish programs, set each program's tuition per
 semester in GHS, and create fixed-amount or percentage scholarship programs at
 `/academy/admin/programs`. Scholarships are assigned by an administrator on

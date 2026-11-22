@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 
-const bcrypt = require('bcryptjs');
 const academy = require('../../../../../../backend/academy-db');
 const auth = require('../../../../../../lib/academy-auth');
+const { verifyAcademyPassword } = require('../../../../../../lib/academy-password');
 const { noDbErrorResponse } = require('../../../../../../lib/api-helpers');
 
 // MITA staff login (email + password). Sets the academy_staff cookie used to
@@ -21,7 +21,7 @@ export async function POST(request) {
     if (!creds || creds.status !== 'active') {
       return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 });
     }
-    if (!creds.passwordHash || !bcrypt.compare(password, creds.passwordHash)) {
+    if (!await verifyAcademyPassword(password, creds.passwordHash)) {
       return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 });
     }
 

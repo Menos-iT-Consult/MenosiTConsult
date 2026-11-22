@@ -47,6 +47,15 @@ async function ensureAcademySchema(query) {
     created_at timestamptz DEFAULT now(),
     admitted_at timestamptz
   );`);
+  await query(`CREATE TABLE IF NOT EXISTS academy_login_rate_limits (
+    key_hash text PRIMARY KEY,
+    attempts int NOT NULL DEFAULT 0,
+    window_started_at timestamptz NOT NULL DEFAULT now(),
+    blocked_until timestamptz,
+    updated_at timestamptz NOT NULL DEFAULT now()
+  );`);
+  await query(`CREATE INDEX IF NOT EXISTS academy_login_rate_limits_updated_at
+    ON academy_login_rate_limits (updated_at);`);
   await query(`ALTER TABLE academy_students
     ADD COLUMN IF NOT EXISTS middle_name text,
     ADD COLUMN IF NOT EXISTS gender text,
