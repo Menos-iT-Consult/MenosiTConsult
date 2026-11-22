@@ -81,13 +81,13 @@ node server.js    # API only, on PORT (default 3000)
 | `SMTP_FROM` | optional | Visible From address for main-site email; defaults to `support@menositconsult.com` |
 | `ACADEMY_SMTP_HOST` / `ACADEMY_SMTP_PORT` / `ACADEMY_SMTP_USER` / `ACADEMY_SMTP_PASS` | for Academy email | Independent Nodemailer transport for Academy instructor invitations; does not fall back to main-site SMTP |
 | `ACADEMY_SMTP_FROM` | optional | Visible From address for Academy email; defaults to `academy@menositconsult.com` |
-| `ACADEMY_MNOTIFY_API_KEY` | for admission SMS | Private API key for the Academy's mNotify SMS integration |
-| `ACADEMY_MNOTIFY_SENDER` | for admission SMS | mNotify-approved sender ID, up to 11 characters |
+| `ACADEMY_MNOTIFY_API_KEY` | for Academy SMS | Private API key for the Academy's mNotify SMS integration |
+| `ACADEMY_MNOTIFY_SENDER` | for Academy SMS | mNotify-approved sender ID, up to 11 characters |
 | `SITE_URL` | optional | Public base URL used in instructor setup invitation links; defaults to the request origin |
 | `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET` | for main-site media | Main-site Cloudflare R2 credentials and bucket |
 | `ACADEMY_R2_BUCKET` | optional | Separate Academy R2 bucket; must differ from `R2_BUCKET` and does not fall back to it |
 | `ACADEMY_R2_PUBLIC_BASE` | optional | Public base URL for Academy media in its separate bucket |
-| `ACADEMY_CERTIFICATE_R2_BUCKET` | for Academy certificates | Dedicated private R2 bucket for certificate templates and issued PDFs; must differ from both media buckets and must not have public access enabled |
+| `ACADEMY_CERTIFICATE_R2_BUCKET` | for Academy certificates and course files | Dedicated private R2 bucket for certificate PDFs and instructor-uploaded course materials; must differ from both media buckets and must not have public access enabled |
 | `RECIPIENT_EMAIL` | for email | Where contact-form enquiries are delivered |
 | `ADMIN_PASSWORD` | for first boot | Seeded into the `admin` table |
 | `ACADEMY_ADMIN_EMAIL` / `ACADEMY_ADMIN_PASSWORD` | before first Academy request | Credentials for the first Academy administrator, seeded only when no Academy staff accounts exist |
@@ -127,15 +127,20 @@ through this flow. See the [mNotify/BMS API documentation](https://developer.bms
 Admins can also create courses, issue instructor accounts, create academic
 sessions, assign courses, and deactivate or reactivate active instructors.
 
-An issued instructor account starts pending. The Academy emails a single-use
-setup link that expires after seven days; setting a password activates the
-account. If SMTP delivery fails, the pending account remains in place and an
-administrator can resend the invitation (which replaces the previous link).
-Configure the Academy SMTP variables above before issuing invitations; the
-main-site `SMTP_*` settings are not used for Academy mail. Instructors
+An issued instructor account starts pending. The Academy sends a single-use
+setup link by email and SMS; it expires after seven days, and setting a
+password activates the account. Instructor invitations require a Ghana mobile
+number, Academy SMTP settings, and Academy mNotify settings. If either channel
+fails, the pending account remains in place and an administrator can resend
+the invitation (which replaces the previous link). The main-site `SMTP_*`
+settings are not used for Academy mail. Instructors
 sign in at `/instructor/login` and can access only courses assigned to their
 account. Their course workspaces include student rosters, assignments and
-submission review, gradebooks, attendance, and lesson planning.
+submission review, gradebooks, attendance, lesson planning, and a Lessons &
+content area for adding HTTPS resources and private PDF, TXT, DOCX, PPTX, and
+XLSX files (up to 4 MB each). Uploaded course files are served only to students
+enrolled in the matching course session and the assigned instructor. Student
+lesson progress is tracked in the course portal.
 
 Cloudflare Email Routing can forward replies sent to
 `academy@menositconsult.com`, but it does not send outbound mail. The Academy's
@@ -155,7 +160,8 @@ Main-site image uploads target `R2_BUCKET`; Academy media storage targets
 to the main bucket. The storage adapter shares the R2 account credentials, so
 the R2 token must have access to both media buckets. Academy certificate
 templates and issued PDFs use the separate `ACADEMY_CERTIFICATE_R2_BUCKET`;
-keep that bucket private and grant the shared R2 credentials access to it.
+private course files also use this bucket; keep it private and grant the shared
+R2 credentials access to it.
 Certificate templates must contain fillable text fields named `student_name`,
 `program_name`, `issue_date`, and `certificate_number`. Replacing a template
 affects future issuances only.

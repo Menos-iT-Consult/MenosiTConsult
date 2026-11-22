@@ -7,6 +7,10 @@ const {
   isInstructorInvitationRedeemable,
 } = require('../lib/academy-invitations');
 const { instructorOwnsCourse } = require('../lib/academy-staff');
+const {
+  deliverInstructorInvitation,
+  invitationSmsMessage,
+} = require('../lib/academy-invitation-delivery');
 
 test('instructor setup tokens are random, hashed, and expire after seven days', () => {
   const now = new Date('2025-01-01T00:00:00.000Z');
@@ -45,6 +49,65 @@ test('instructors can access only their own active course assignments', () => {
   assert.equal(instructorOwnsCourse({ ...instructor, status: 'inactive' }, { instructorStaffId: 'staff-1' }), false);
   assert.equal(instructorOwnsCourse({ ...instructor, role: 'admin' }, { instructorStaffId: 'staff-1' }), false);
   assert.equal(instructorOwnsCourse(instructor, null), false);
+});
+
+test('instructor invitations send the same setup link by email and SMS and log both deliveries', async () => {
+  const calls = [];
+  const logs = [];
+  const delivery = await deliverInstructorInvitation({
+    id: 'staff-1',
+    name: 'Test Instructor',
+    email: 'instructor@example.test',
+    phone: '0241234567',
+  }, 'https://academy.example.test/instructor/setup?token=single-use-token', {
+    emailSender: async (message) => {
+      calls.push(['email', message]);
+      return { ok: true };
+    },
+    smsSender: async (message) => {
+      calls.push(['sms', message]);
+      return { ok: true, campaignId: 'campaign-1' };
+    },
+    log: async (entry) => logs.push(entry),
+  });
+
+  assert.equal(delivery.email.sent, true);
+  assert.equal(delivery.sms.sent, true);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0][1].setupUrl, 'https://academy.example.test/instructor/setup?token=single-use-token');
+  assert.match(calls[1][1].message, /single-use-token/);
+  assert.equal(logs.length, 2);
+  assert.deepEqual(logs.map((entry) => entry.channel), ['email', 'sms']);
+  assert.equal(invitationSmsMessage('Instructor\nName', 'https://academy.example.test/setup').includes('\n'), false);
+});
+
+test('instructor invitation attempts SMS and records its result when email delivery fails', async () => {
+  const attempted = [];
+  const logs = [];
+  const delivery = await deliverInstructorInvitation({
+    id: 'staff-1',
+    name: 'Test Instructor',
+    email: 'instructor@example.test',
+    phone: '0241234567',
+  }, 'https://academy.example.test/instructor/setup?token=single-use-token', {
+    emailSender: async () => {
+      attempted.push('email');
+      return { ok: false, error: 'SMTP unavailable' };
+    },
+    smsSender: async () => {
+      attempted.push('sms');
+      return { ok: true };
+    },
+    log: async (entry) => logs.push(entry),
+  });
+
+  assert.deepEqual(attempted, ['email', 'sms']);
+  assert.equal(delivery.email.sent, false);
+  assert.equal(delivery.sms.sent, true);
+  assert.deepEqual(logs.map(({ channel, status }) => [channel, status]), [
+    ['email', 'failed'],
+    ['sms', 'sent'],
+  ]);
 });
 
 test('Academy invitation uses its custom From address and separate SMTP transport', async () => {
@@ -174,6 +237,18 @@ test('Academy R2 requires its own bucket and rejects the main-site bucket', asyn
     await assert.rejects(
       academyR2.getPrivatePhoto('academy/media/2026/student.jpg'),
       /Invalid private Academy passport photo key/
+    );
+    assert.equal(
+      academyR2.isPrivateCourseMaterialKey('academy/private/course-content/2026/0123456789abcdef0123456789abcdef01234567.pdf'),
+      true
+    );
+    assert.equal(
+      academyR2.isPrivateCourseMaterialKey('academy/private/course-content/2026/../../student.pdf'),
+      false
+    );
+    await assert.rejects(
+      academyR2.getPrivateCourseMaterial('academy/media/2026/student.pdf'),
+      /Invalid private Academy course material key/
     );
 
     process.env.ACADEMY_R2_BUCKET = 'MAIN-MEDIA';

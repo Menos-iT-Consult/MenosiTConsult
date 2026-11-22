@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import ProgramCards from './ProgramCards';
+import AcademyPortalLink from './AcademyPortalLink';
 
 export const metadata = {
   title: 'MITA IT Academy | Practical Technology Training',
@@ -60,7 +61,7 @@ export default function AcademyWelcomePage() {
             <a href="#admissions">Admissions</a>
           </nav>
           <div className="academy-header-actions">
-            <Link className="academy-login-link" href="/academy/login">Student login</Link>
+            <AcademyPortalLink className="academy-login-link" />
             <Link className="academy-button academy-button-small" href="/academy/register">Apply now</Link>
           </div>
         </div>
@@ -204,9 +205,11 @@ export default function AcademyWelcomePage() {
             <h2>Your learning, all in one place.</h2>
             <p>Sign in to see your courses, upcoming work, grades, and class schedule.</p>
           </div>
-          <Link className="academy-button" href="/academy/login">
-            Open student portal <span aria-hidden="true">→</span>
-          </Link>
+          <AcademyPortalLink
+            className="academy-button"
+            signedOutLabel="Open student portal →"
+            signedInLabel="Open portal →"
+          />
         </div>
       </section>
 

@@ -11,6 +11,8 @@ export default function AcademyInstructorAdminPage() {
   const [sessions, setSessions] = useState([]);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [phoneDrafts, setPhoneDrafts] = useState({});
   const [courseForm, setCourseForm] = useState({
     title: '', code: '', programId: '', creditHours: '3', semesterNumber: '1', description: '',
   });
@@ -42,6 +44,10 @@ export default function AcademyInstructorAdminPage() {
       if (!staffResponse.ok) throw new Error(staffResult.error || 'Could not load staff accounts.');
       if (!coursesResponse.ok) throw new Error(coursesResult.error || 'Could not load courses.');
       setStaff(staffResult.filter((member) => member.role === 'instructor'));
+      setPhoneDrafts(Object.fromEntries(
+        staffResult.filter((member) => member.role === 'instructor')
+          .map((member) => [member.id, member.phone || ''])
+      ));
       setCourses(coursesResult.courses);
       setPrograms(coursesResult.programs);
       const sessionsResponse = await fetch('/api/academy/admin/sessions', { credentials: 'include' });
@@ -77,7 +83,7 @@ export default function AcademyInstructorAdminPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ name, email }),
+        body: JSON.stringify({ name, email, phone }),
       });
       const result = await response.json();
       if (result.staff) {
@@ -87,7 +93,8 @@ export default function AcademyInstructorAdminPage() {
       if (!response.ok) throw new Error(result.error || 'Could not issue instructor account.');
       setName('');
       setEmail('');
-      setNotice('Instructor account created and setup invitation sent.');
+      setPhone('');
+      setNotice('Instructor invitation sent by email and SMS.');
       await load();
     } catch (saveError) {
       await load();
@@ -178,11 +185,16 @@ export default function AcademyInstructorAdminPage() {
     try {
       const response = await fetch(
         `/api/academy/admin/staff/${encodeURIComponent(member.id)}/invitation`,
-        { method: 'POST', credentials: 'include' }
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ phone: phoneDrafts[member.id] || '' }),
+        }
       );
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Could not resend invitation.');
-      setNotice(`A new setup link was sent to ${member.email}.`);
+      setNotice(`A new setup link was sent to ${member.email} by email and SMS.`);
     } catch (saveError) {
       setError(saveError.message || 'Could not resend invitation.');
     } finally {
@@ -216,7 +228,7 @@ export default function AcademyInstructorAdminPage() {
 
         <section className="ap-card ap-section">
           <h2>Issue an instructor account</h2>
-          <p className="ap-muted">The instructor receives a single-use setup link that expires after seven days.</p>
+          <p className="ap-muted">The instructor receives a single-use setup link by email and SMS. The link expires after seven days.</p>
           <form onSubmit={createInstructor} className="ap-announcement-form">
             <label htmlFor="instructor-name">Full name</label>
             <input
@@ -235,6 +247,17 @@ export default function AcademyInstructorAdminPage() {
               autoComplete="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
+              required
+            />
+            <label htmlFor="instructor-phone">Ghana mobile number for SMS</label>
+            <input
+              id="instructor-phone"
+              className="ap-input"
+              type="tel"
+              autoComplete="tel"
+              placeholder="024 123 4567 or +233 24 123 4567"
+              value={phone}
+              onChange={(event) => setPhone(event.target.value)}
               required
             />
             <button className="ap-button ap-button-primary" type="submit" disabled={saving === 'create'}>
@@ -320,20 +343,36 @@ export default function AcademyInstructorAdminPage() {
                   <div className="ap-card-heading">
                     <div>
                       <h3>{member.name}</h3>
-                      <p className="ap-muted">{member.email}</p>
+                      <p className="ap-muted">{member.email}{member.phone ? ` · ${member.phone}` : ''}</p>
                     </div>
                     <span className={`ap-chip ${member.status === 'active' ? 'ap-chip-active' : 'ap-chip-neutral'}`}>
                       {member.status}
                     </span>
                   </div>
                   {member.status === 'pending' ? (
-                    <button
-                      className="ap-button"
-                      onClick={() => resendInvitation(member)}
-                      disabled={saving === member.id}
-                    >
-                      {saving === member.id ? 'Sending…' : 'Resend setup invitation'}
-                    </button>
+                    <div className="ap-instructor-invitation">
+                      <label>
+                        Ghana mobile number for SMS
+                        <input
+                          className="ap-input"
+                          type="tel"
+                          autoComplete="tel"
+                          placeholder="024 123 4567 or +233 24 123 4567"
+                          value={phoneDrafts[member.id] || ''}
+                          onChange={(event) => setPhoneDrafts((current) => ({
+                            ...current,
+                            [member.id]: event.target.value,
+                          }))}
+                        />
+                      </label>
+                      <button
+                        className="ap-button"
+                        onClick={() => resendInvitation(member)}
+                        disabled={saving === member.id || !phoneDrafts[member.id]}
+                      >
+                        {saving === member.id ? 'Sending…' : 'Resend by email and SMS'}
+                      </button>
+                    </div>
                   ) : (
                     <button
                       className="ap-button"

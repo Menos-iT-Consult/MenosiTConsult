@@ -4,8 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import InstructorQuizManager from '../InstructorQuizManager';
+import InstructorLessonMaterials from '../InstructorLessonMaterials';
 
-const TABS = ['Overview', 'Assignments', 'Quizzes', 'Gradebook', 'Attendance', 'Lesson plans'];
+const TABS = ['Overview', 'Assignments', 'Quizzes', 'Gradebook', 'Attendance', 'Lessons & content'];
 const ATTENDANCE_STATUSES = [
   ['present', 'Present'],
   ['absent', 'Absent'],
@@ -293,7 +294,7 @@ export default function InstructorCoursePage() {
       notes: lesson.notes || '',
       resources: lesson.resources || '',
     });
-    setTab('Lesson plans');
+    setTab('Lessons & content');
   }
 
   async function deleteLesson(lesson) {
@@ -556,7 +557,7 @@ export default function InstructorCoursePage() {
           </section>
         )}
 
-        {tab === 'Lesson plans' && (
+        {tab === 'Lessons & content' && (
           <section className="ap-section">
             <article className="ap-card ap-section">
               <h2>{editingLessonId ? 'Edit lesson plan' : 'Plan a lesson'}</h2>
@@ -612,6 +613,13 @@ export default function InstructorCoursePage() {
                     {lesson.objectives && <p><strong>Objectives:</strong> {lesson.objectives}</p>}
                     {lesson.notes && <p className="ap-announcement-body">{lesson.notes}</p>}
                     {lesson.resources && <p><strong>Resources:</strong> {lesson.resources}</p>}
+                        <InstructorLessonMaterials
+                          courseId={courseId}
+                          lesson={lesson}
+                          onChanged={(lessonId, materials) => setLessonPlans((current) =>
+                            current.map((item) => item.id === lessonId ? { ...item, materials } : item)
+                          )}
+                        />
                   </article>
                 ))}
               </div>

@@ -147,6 +147,7 @@ function mapLessonPlan(row) {
     objectives: row.objectives || '',
     notes: row.notes || '',
     resources: row.resources || '',
+    materials: row.materials || [],
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at),
   };
@@ -157,6 +158,7 @@ function mapStaff(r) {
     id: r.id,
     name: r.name,
     email: r.email,
+    phone: r.phone || '',
     role: r.role,
     status: r.status,
     createdAt: iso(r.created_at),
@@ -644,9 +646,10 @@ async function updateStaff(id, s) {
         SET name = COALESCE($2, name),
             email = COALESCE($3, email),
             role = COALESCE($4, role),
-            status = COALESCE($5, status)
+            status = COALESCE($5, status),
+            phone = COALESCE($6, phone)
       WHERE id = $1 RETURNING *`,
-    [id, s.name, s.email, s.role, s.status]
+    [id, s.name, s.email, s.role, s.status, s.phone]
   );
   if (rows[0] && s.status && s.status !== 'pending') {
     await q(
@@ -668,14 +671,14 @@ async function deleteStaff(id) {
   await q('DELETE FROM academy_staff WHERE id = $1', [id]);
 }
 
-async function createInstructorInvitation({ name, email, tokenHash, expiresAt }) {
+async function createInstructorInvitation({ name, email, phone, tokenHash, expiresAt }) {
   return transaction(async (client) => {
     const staffId = newId('astf');
     const { rows } = await client.query(
-      `INSERT INTO academy_staff (id, name, email, role, status, password_hash)
-       VALUES ($1, $2, $3, 'instructor', 'pending', NULL)
+      `INSERT INTO academy_staff (id, name, email, phone, role, status, password_hash)
+       VALUES ($1, $2, $3, $4, 'instructor', 'pending', NULL)
        RETURNING *`,
-      [staffId, name, email]
+      [staffId, name, email, phone]
     );
     await client.query(
       `INSERT INTO academy_staff_invitations (id, staff_id, token_hash, expires_at)
@@ -2092,7 +2095,19 @@ async function saveInstructorAttendance(staffId, { courseId, sessionId, meetingD
 
 async function listInstructorLessonPlans(staffId, courseId) {
   const { rows } = await q(
-    `SELECT p.* FROM academy_lesson_plans p
+    `SELECT p.*,
+            COALESCE((
+              SELECT json_agg(json_build_object(
+                'id', m.id, 'title', m.title, 'kind', m.kind, 'url', m.url,
+                'contentType', m.content_type, 'fileSize', m.file_size,
+                'fileName', m.file_name,
+                'downloadUrl', CASE WHEN m.kind = 'file'
+                  THEN '/api/academy/lessons/' || p.id || '/materials/' || m.id
+                  ELSE NULL END
+              ) ORDER BY m.created_at)
+              FROM academy_lesson_materials m WHERE m.lesson_plan_id = p.id
+            ), '[]'::json) AS materials
+       FROM academy_lesson_plans p
        JOIN academy_courses c ON c.id = p.course_id
       WHERE c.instructor_staff_id = $1 AND p.course_id = $2
       ORDER BY p.lesson_date NULLS LAST, p.created_at DESC`,
@@ -2108,6 +2123,16 @@ async function listStudentLessons(studentId, { courseId } = {}) {
     `SELECT p.id, p.course_id, p.session_id, p.lesson_date, p.title,
             p.objectives, p.notes, p.resources, c.code AS course_code,
             c.title AS course_title, s.name AS session_name,
+            COALESCE((
+              SELECT json_agg(json_build_object(
+                'id', m.id, 'title', m.title, 'kind', m.kind, 'url', m.url,
+                'contentType', m.content_type, 'fileSize', m.file_size,
+                'downloadUrl', CASE WHEN m.kind = 'file'
+                  THEN '/api/academy/lessons/' || p.id || '/materials/' || m.id
+                  ELSE NULL END
+              ) ORDER BY m.created_at)
+              FROM academy_lesson_materials m WHERE m.lesson_plan_id = p.id
+            ), '[]'::json) AS materials,
             (progress.lesson_plan_id IS NOT NULL) AS completed,
             progress.completed_at
        FROM academy_lesson_plans p
@@ -2134,6 +2159,7 @@ async function listStudentLessons(studentId, { courseId } = {}) {
     objectives: row.objectives || '',
     notes: row.notes || '',
     resources: row.resources || '',
+    materials: row.materials || [],
     courseCode: row.course_code || '',
     courseTitle: row.course_title || '',
     sessionName: row.session_name || '',
@@ -2540,6 +2566,106 @@ async function deleteInstructorLessonPlan(staffId, planId) {
     [planId, staffId]
   );
   return rows.length > 0;
+}
+
+async function createInstructorLessonMaterial(staffId, lessonId, material) {
+  const { rows } = await q(
+    `INSERT INTO academy_lesson_materials
+       (id, lesson_plan_id, title, kind, url, storage_key, content_type,
+        file_size, file_name, created_by)
+     SELECT $1, p.id, $4, $5, $6, $7, $8, $9, $10, $2
+       FROM academy_lesson_plans p
+       JOIN academy_courses c ON c.id = p.course_id
+      WHERE p.id = $3 AND p.course_id = $11 AND c.instructor_staff_id = $2
+     RETURNING id, lesson_plan_id, title, kind, url, content_type,
+               file_size, file_name, created_at`,
+    [
+      newId('almat'), staffId, lessonId, material.title, material.kind,
+      material.url || null, material.storageKey || null, material.contentType || null,
+      material.fileSize || null, material.fileName || null,
+      material.courseId,
+    ]
+  );
+  return rows[0] ? mapLessonMaterial(rows[0]) : null;
+}
+
+async function listInstructorLessonMaterials(staffId, lessonId) {
+  const { rows } = await q(
+    `SELECT m.* FROM academy_lesson_materials m
+       JOIN academy_lesson_plans p ON p.id = m.lesson_plan_id
+       JOIN academy_courses c ON c.id = p.course_id
+      WHERE c.instructor_staff_id = $1 AND p.id = $2
+      ORDER BY m.created_at`,
+    [staffId, lessonId]
+  );
+  return rows.map(mapLessonMaterial);
+}
+
+function mapLessonMaterial(row) {
+  return {
+    id: row.id,
+    lessonId: row.lesson_plan_id,
+    title: row.title,
+    kind: row.kind,
+    url: row.url || '',
+    contentType: row.content_type || '',
+    fileSize: row.file_size == null ? null : Number(row.file_size),
+    fileName: row.file_name || '',
+    downloadUrl: row.kind === 'file'
+      ? `/api/academy/lessons/${encodeURIComponent(row.lesson_plan_id)}/materials/${encodeURIComponent(row.id)}`
+      : '',
+    createdAt: row.created_at ? iso(row.created_at) : null,
+  };
+}
+
+async function getInstructorLessonMaterial(staffId, lessonId, materialId) {
+  const { rows } = await q(
+    `SELECT m.* FROM academy_lesson_materials m
+       JOIN academy_lesson_plans p ON p.id = m.lesson_plan_id
+       JOIN academy_courses c ON c.id = p.course_id
+      WHERE c.instructor_staff_id = $1 AND p.id = $2 AND m.id = $3`,
+    [staffId, lessonId, materialId]
+  );
+  return rows[0] || null;
+}
+
+async function getStudentLessonMaterial(studentId, lessonId, materialId) {
+  const { rows } = await q(
+    `SELECT m.* FROM academy_lesson_materials m
+       JOIN academy_lesson_plans p ON p.id = m.lesson_plan_id
+      WHERE p.id = $2 AND m.id = $3 AND EXISTS (
+        SELECT 1 FROM academy_enrollments e
+         WHERE e.student_id = $1 AND e.course_id = p.course_id
+           AND (p.session_id IS NULL OR e.session_id = p.session_id)
+           AND e.status IN ('enrolled', 'active')
+      )`,
+    [studentId, lessonId, materialId]
+  );
+  return rows[0] || null;
+}
+
+async function listInstructorLessonMaterialKeys(staffId, lessonId) {
+  const { rows } = await q(
+    `SELECT m.storage_key FROM academy_lesson_materials m
+       JOIN academy_lesson_plans p ON p.id = m.lesson_plan_id
+       JOIN academy_courses c ON c.id = p.course_id
+      WHERE c.instructor_staff_id = $1 AND p.id = $2
+        AND m.kind = 'file'`,
+    [staffId, lessonId]
+  );
+  return rows.map((row) => row.storage_key);
+}
+
+async function deleteInstructorLessonMaterial(staffId, lessonId, materialId) {
+  const { rows } = await q(
+    `DELETE FROM academy_lesson_materials m
+      USING academy_lesson_plans p, academy_courses c
+      WHERE m.id = $3 AND m.lesson_plan_id = p.id AND p.id = $2
+        AND c.id = p.course_id AND c.instructor_staff_id = $1
+      RETURNING m.storage_key`,
+    [staffId, lessonId, materialId]
+  );
+  return rows[0] || null;
 }
 
 function mapEnrollment(r) {
@@ -3552,6 +3678,9 @@ module.exports = {
   listStudentAttendance, listInstructorAttendance, saveInstructorAttendance,
   listInstructorLessonPlans, listStudentLessons, setStudentLessonProgress, createInstructorLessonPlan,
   updateInstructorLessonPlan, deleteInstructorLessonPlan,
+  createInstructorLessonMaterial, listInstructorLessonMaterials,
+  getInstructorLessonMaterial, getStudentLessonMaterial,
+  listInstructorLessonMaterialKeys, deleteInstructorLessonMaterial,
   listInstructorQuizzes, createInstructorQuiz, updateInstructorQuiz, setInstructorQuizPublished,
   listStudentQuizzes, startStudentQuizAttempt, saveStudentQuizAnswers,
   submitStudentQuizAttempt, listStudentQuizResults,

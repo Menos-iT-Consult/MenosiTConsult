@@ -208,11 +208,13 @@ async function ensureAcademySchema(query) {
   await query(`CREATE TABLE IF NOT EXISTS academy_staff (
     id text PRIMARY KEY,
     name text, email text UNIQUE,
+    phone text,
     role text DEFAULT 'instructor',
     status text DEFAULT 'active',
     password_hash text,
     created_at timestamptz DEFAULT now()
   );`);
+  await query(`ALTER TABLE academy_staff ADD COLUMN IF NOT EXISTS phone text;`);
   await query(`CREATE TABLE IF NOT EXISTS academy_staff_invitations (
     id text PRIMARY KEY,
     staff_id text NOT NULL REFERENCES academy_staff(id) ON DELETE CASCADE,
@@ -256,6 +258,27 @@ async function ensureAcademySchema(query) {
     completed_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (student_id, lesson_plan_id)
   );`);
+  await query(`CREATE TABLE IF NOT EXISTS academy_lesson_materials (
+    id text PRIMARY KEY,
+    lesson_plan_id text NOT NULL REFERENCES academy_lesson_plans(id) ON DELETE CASCADE,
+    title text NOT NULL,
+    kind text NOT NULL CHECK (kind IN ('link', 'file')),
+    url text,
+    storage_key text,
+    content_type text,
+    file_size int,
+    file_name text,
+    created_by text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    CHECK (
+      (kind = 'link' AND url IS NOT NULL AND storage_key IS NULL)
+      OR
+      (kind = 'file' AND url IS NULL AND storage_key IS NOT NULL
+        AND content_type IS NOT NULL AND file_size IS NOT NULL AND file_name IS NOT NULL)
+    )
+  );`);
+  await query(`CREATE INDEX IF NOT EXISTS academy_lesson_materials_lesson
+    ON academy_lesson_materials (lesson_plan_id, created_at);`);
   await query(`CREATE TABLE IF NOT EXISTS academy_student_notifications (
     id text PRIMARY KEY,
     student_id text NOT NULL REFERENCES academy_students(id) ON DELETE CASCADE,

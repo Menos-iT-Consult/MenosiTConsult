@@ -66,7 +66,7 @@ export default function AcademySupportAdminPage() {
         }];
       }));
       setDrafts((current) => ({ ...current, [ticket.id]: '' }));
-      setNotice(`Response sent to ${ticket.studentName} by email and SMS.`);
+      setNotice(`Response added to the conversation with ${ticket.studentName}.`);
     } catch (replyError) {
       setError(replyError.message || 'Could not send the response.');
     } finally {
@@ -107,7 +107,7 @@ export default function AcademySupportAdminPage() {
       <header className="ap-page-head ap-admin-heading">
         <div>
           <h1>Student support</h1>
-          <p>Review student requests and reply. Responses are also sent to students by email and SMS.</p>
+          <p>Review student requests and reply in the portal conversation.</p>
         </div>
         <label className="ap-filter-field">Show requests
           <select className="ap-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>

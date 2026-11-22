@@ -6,6 +6,11 @@ function safeResourceUrl(value) {
   return typeof value === 'string' && (/^https?:\/\//i.test(value) || /^\/(?!\/)/.test(value));
 }
 
+function formatSize(bytes) {
+  if (!Number.isFinite(Number(bytes))) return '';
+  return `${Math.max(1, Math.round(Number(bytes) / 1024))} KB`;
+}
+
 export default function CourseLessons({ lessons }) {
   const [items, setItems] = useState(lessons);
   const [saving, setSaving] = useState('');
@@ -79,6 +84,23 @@ export default function CourseLessons({ lessons }) {
               <a className="ap-resource-link" href={lesson.resources} target="_blank" rel="noreferrer">
                 Open lesson resource
               </a>
+            )}
+            {lesson.materials?.length > 0 && (
+              <div className="ap-lesson-materials">
+                <h3>Lesson materials</h3>
+                <ul className="ap-lesson-material-list">
+                  {lesson.materials.map((material) => (
+                    <li key={material.id}>
+                      {material.kind === 'file' && safeResourceUrl(material.downloadUrl) ? (
+                        <a href={material.downloadUrl}>{material.title}</a>
+                      ) : material.kind === 'link' && safeResourceUrl(material.url) ? (
+                        <a href={material.url} target="_blank" rel="noreferrer">{material.title}</a>
+                      ) : null}
+                      {material.kind === 'file' && <small>{formatSize(material.fileSize)}</small>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </article>
         ))}

@@ -3,8 +3,16 @@ import { NextResponse } from 'next/server';
 const academy = require('../../../../../../../backend/academy-db');
 const staffAuth = require('../../../../../../../lib/academy-staff');
 const invitations = require('../../../../../../../lib/academy-invitations');
-const mailer = require('../../../../../../../backend/mailer');
+const { deliverInstructorInvitation } = require('../../../../../../../lib/academy-invitation-delivery');
+const { normalizeGhanaRecipient } = require('../../../../../../../lib/academy-sms');
 const { noDbErrorResponse } = require('../../../../../../../lib/api-helpers');
+
+function deliveryError(delivery) {
+  const failed = Object.entries(delivery)
+    .filter(([, result]) => !result.sent)
+    .map(([channel]) => channel);
+  return `The account is still pending, but ${failed.join(' and ')} delivery failed. Check the ${failed.join(' and ')} settings and resend.`;
+}
 
 export async function POST(request, { params }) {
   try {
@@ -12,9 +20,19 @@ export async function POST(request, { params }) {
     if (gate.error) return NextResponse.json({ error: gate.error }, { status: gate.status });
 
     const { id } = await params;
-    const staff = await academy.getStaff(id);
+    let staff = await academy.getStaff(id);
     if (!staff || staff.role !== 'instructor' || staff.status !== 'pending') {
       return NextResponse.json({ error: 'Only pending instructor invitations can be resent.' }, { status: 404 });
+    }
+    const body = await request.json().catch(() => ({}));
+    const requestedPhone = body.phone == null ? staff.phone : String(body.phone).trim();
+    const phone = normalizeGhanaRecipient(requestedPhone);
+    if (!phone) {
+      return NextResponse.json({ error: 'Provide a valid Ghana mobile number for the SMS invitation.' }, { status: 400 });
+    }
+    if (phone !== staff.phone) {
+      staff = await academy.updateStaff(id, { phone });
+      if (!staff) return NextResponse.json({ error: 'Instructor account not found.' }, { status: 404 });
     }
 
     const invitation = invitations.createInstructorInvitationToken();
@@ -33,28 +51,14 @@ export async function POST(request, { params }) {
       new URL(request.url).origin
     ).replace(/\/$/, '');
     const setupUrl = `${siteUrl}/instructor/setup?token=${encodeURIComponent(invitation.token)}`;
-    let delivery;
-    try {
-      delivery = await mailer.sendInstructorInvitationEmail({
-        to: updated.email,
-        name: updated.name,
-        setupUrl,
-      });
-    } catch (emailError) {
-      console.error('Academy instructor invitation email error:', emailError);
+    const delivery = await deliverInstructorInvitation(updated, setupUrl);
+    if (!delivery.email.sent || !delivery.sms.sent) {
       return NextResponse.json(
-        { error: 'The account is still pending, but email delivery failed. Check SMTP settings and resend.' },
+        { error: deliveryError(delivery), delivery },
         { status: 502 }
       );
     }
-    if (!delivery.ok) {
-      console.error('Academy instructor invitation email was not sent:', delivery.error);
-      return NextResponse.json(
-        { error: 'The account is still pending, but email delivery failed. Check SMTP settings and resend.' },
-        { status: 502 }
-      );
-    }
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, delivery });
   } catch (err) {
     const noDb = noDbErrorResponse(err);
     if (noDb) return noDb;

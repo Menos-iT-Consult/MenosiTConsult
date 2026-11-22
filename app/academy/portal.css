@@ -655,6 +655,17 @@
 .ap-lesson-list { margin-top: 14px; }
 .ap-lesson-card { display: grid; gap: 8px; }
 .ap-lesson-card > p { margin: 0; color: #64748b; line-height: 1.5; }
+.ap-lesson-materials { display: grid; gap: 10px; padding-top: 12px; border-top: 1px solid #e2e8f0; }
+.ap-lesson-materials h3, .ap-lesson-materials h4 { margin: 0; font-size: .95rem; }
+.ap-lesson-materials > .ap-muted { margin: 0; }
+.ap-lesson-material-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.ap-lesson-material-list li { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 8px 10px; border-radius: 8px; background: #f8fafc; }
+.ap-lesson-material-list li > div { display: grid; min-width: 0; gap: 4px; }
+.ap-lesson-material-list a { overflow-wrap: anywhere; color: var(--blue); font-weight: 600; text-decoration: none; }
+.ap-lesson-material-list a:hover { text-decoration: underline; }
+.ap-lesson-material-list small { color: #64748b; }
+.ap-lesson-material-form { display: grid; gap: 10px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; }
+.ap-lesson-material-form label { display: grid; gap: 6px; color: #475569; font-size: .85rem; font-weight: 650; }
 .ap-lesson-toggle { display: flex; align-items: flex-start; gap: 12px; cursor: pointer; }
 .ap-lesson-toggle input { width: 18px; height: 18px; flex: none; margin-top: 2px; accent-color: var(--blue); }
 .ap-lesson-toggle span { display: grid; gap: 4px; }
@@ -848,6 +859,8 @@
 .ap-instructor-courses h4 { margin: 0 0 10px; }
 .ap-instructor-course { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
 .ap-instructor-course small { margin-left: auto; }
+.ap-instructor-invitation { display: grid; max-width: 420px; gap: 10px; }
+.ap-instructor-invitation label { display: grid; gap: 6px; color: #475569; font-size: .85rem; font-weight: 650; }
 .ap-button-danger { color: #b91c1c; border-color: rgba(220, 38, 38, .25); }
 
 .ap-id-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
@@ -1083,6 +1096,7 @@
 }
 
 @media screen and (max-width: 640px) {
+  .ap-lesson-material-list li { flex-direction: column; }
   .ap-quiz-editor-option { grid-template-columns: minmax(0, 1fr) 18px 55px; }
   .ap-quiz-editor-option > span:first-child { grid-column: 1 / -1; }
   .ap-quiz-card .ap-card-heading { flex-direction: column; }

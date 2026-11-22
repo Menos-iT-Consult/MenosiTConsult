@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server';
 const academy = require('../../../../../../../backend/academy-db');
 const staffAuth = require('../../../../../../../lib/academy-staff');
 const { normalizeSupportMessage } = require('../../../../../../../lib/academy-portal');
-const { sendStudentNotification } = require('../../../../../../../lib/academy-notifications');
 const { noDbErrorResponse } = require('../../../../../../../lib/api-helpers');
 
 export async function POST(request, { params }) {
@@ -22,16 +21,7 @@ export async function POST(request, { params }) {
       message,
     });
     if (!created) return NextResponse.json({ error: 'Support request not found.' }, { status: 404 });
-    const student = await academy.getStudent(created.studentId);
-    const notifications = student
-      ? await sendStudentNotification(student, {
-          type: 'support_response',
-          subject: `MITA Academy support update: ${created.subject}`,
-          message: `The Academy has replied to your support request "${created.subject}". Sign in to the student portal to view the response.`,
-          metadata: { ticketId: id },
-        })
-      : null;
-    return NextResponse.json({ message: created, notifications }, { status: 201 });
+    return NextResponse.json({ message: created }, { status: 201 });
   } catch (error) {
     const noDb = noDbErrorResponse(error);
     if (noDb) return noDb;

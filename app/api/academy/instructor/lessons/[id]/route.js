@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 const academy = require('../../../../../../backend/academy-db');
+const storage = require('../../../../../../backend/academy-r2');
 const staffAuth = require('../../../../../../lib/academy-staff');
 const { noDbErrorResponse } = require('../../../../../../lib/api-helpers');
 
@@ -57,6 +58,10 @@ export async function DELETE(request, { params }) {
     const gate = await staffAuth.requireInstructor(request);
     if (gate.error) return NextResponse.json({ error: gate.error }, { status: gate.status });
     const { id } = await params;
+    const materialKeys = await academy.listInstructorLessonMaterialKeys(gate.staff.id, id);
+    for (const key of materialKeys) {
+      await storage.deletePrivateCourseMaterial(key);
+    }
     const deleted = await academy.deleteInstructorLessonPlan(gate.staff.id, id);
     if (!deleted) {
       return NextResponse.json({ error: 'Lesson plan not found or not in an assigned course.' }, { status: 404 });
@@ -65,6 +70,7 @@ export async function DELETE(request, { params }) {
   } catch (err) {
     const noDb = noDbErrorResponse(err);
     if (noDb) return noDb;
+    if (err.noR2) return NextResponse.json({ error: err.message }, { status: 503 });
     console.error('Instructor lesson plan delete error:', err);
     return NextResponse.json({ error: 'Could not delete lesson plan.' }, { status: 500 });
   }

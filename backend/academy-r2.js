@@ -252,6 +252,56 @@ async function deletePrivatePhoto(key) {
   }));
 }
 
+const PRIVATE_COURSE_MATERIAL_TYPES = {
+  'application/pdf': 'pdf',
+  'text/plain': 'txt',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+};
+
+function isPrivateCourseMaterialKey(key) {
+  return typeof key === 'string' &&
+    /^academy\/private\/course-content\/\d{4}\/[a-f0-9]{40}\.(pdf|txt|docx|pptx|xlsx)$/.test(key);
+}
+
+async function putPrivateCourseMaterial(buffer, mime) {
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+    throw new Error('A non-empty course material buffer is required.');
+  }
+  const extension = PRIVATE_COURSE_MATERIAL_TYPES[mime];
+  if (!extension) throw new Error('Unsupported private Academy course material type.');
+  const { PutObjectCommand } = require('@aws-sdk/client-s3');
+  const key = `academy/private/course-content/${new Date().getFullYear()}/${crypto.randomBytes(20).toString('hex')}.${extension}`;
+  await getCertificateClient().send(new PutObjectCommand({
+    Bucket: certificateBucket(),
+    Key: key,
+    Body: buffer,
+    ContentType: mime,
+    CacheControl: 'private, no-store',
+  }));
+  return { key, size: buffer.length };
+}
+
+async function getPrivateCourseMaterial(key) {
+  if (!isPrivateCourseMaterialKey(key)) throw new Error('Invalid private Academy course material key.');
+  const { GetObjectCommand } = require('@aws-sdk/client-s3');
+  const result = await getCertificateClient().send(new GetObjectCommand({
+    Bucket: certificateBucket(),
+    Key: key,
+  }));
+  return Buffer.from(await result.transformToByteArray());
+}
+
+async function deletePrivateCourseMaterial(key) {
+  if (!isPrivateCourseMaterialKey(key)) throw new Error('Invalid private Academy course material key.');
+  const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
+  await getCertificateClient().send(new DeleteObjectCommand({
+    Bucket: certificateBucket(),
+    Key: key,
+  }));
+}
+
 const EXT = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
@@ -330,4 +380,8 @@ module.exports = {
   putPrivatePhoto,
   getPrivatePhoto,
   deletePrivatePhoto,
+  isPrivateCourseMaterialKey,
+  putPrivateCourseMaterial,
+  getPrivateCourseMaterial,
+  deletePrivateCourseMaterial,
 };
