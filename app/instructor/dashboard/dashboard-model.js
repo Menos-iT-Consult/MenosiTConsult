@@ -18,13 +18,12 @@ function buildInstructorDashboardModel({
   progress = [],
 }, now = Date.now()) {
   const pendingSubmissions = submissions.filter((submission) => submission.score == null);
-  const upcomingAssignments = assignments
+  const allUpcomingAssignments = assignments
     .filter((assignment) => {
       const dueAt = Date.parse(assignment.dueAt);
       return assignment.dueAt && Number.isFinite(dueAt) && dueAt >= now;
     })
-    .sort((a, b) => Date.parse(a.dueAt) - Date.parse(b.dueAt))
-    .slice(0, 5);
+    .sort((a, b) => Date.parse(a.dueAt) - Date.parse(b.dueAt));
 
   const dueThisWeekCount = assignments.filter((assignment) => {
     const dueAt = Date.parse(assignment.dueAt);
@@ -37,7 +36,8 @@ function buildInstructorDashboardModel({
   return {
     pendingSubmissions,
     reviewQueue: pendingSubmissions.slice(0, 5),
-    upcomingAssignments,
+    upcomingAssignments: allUpcomingAssignments.slice(0, 5),
+    allUpcomingAssignments,
     dueThisWeekCount,
     enrollmentCount: progress.reduce(
       (total, course) => total + (Number(course.rosterCount) || 0),

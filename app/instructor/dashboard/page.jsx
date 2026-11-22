@@ -3,7 +3,7 @@
 import InstructorDashboardView from './InstructorDashboardView';
 import useInstructorDashboard from './useInstructorDashboard';
 
-export default function InstructorDashboardPage() {
+export default function InstructorDashboardPage({ section = 'overview' }) {
   const { dashboard, loading, error, reload } = useInstructorDashboard();
 
   return (
@@ -12,6 +12,7 @@ export default function InstructorDashboardPage() {
       loading={loading}
       error={error}
       onRefresh={reload}
+      section={section}
     />
   );
 }

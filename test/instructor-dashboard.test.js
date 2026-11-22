@@ -13,6 +13,10 @@ test('instructor dashboard groups pending work, upcoming deadlines, and course e
       { id: 'later', dueAt: '2026-11-27T12:00:00.000Z' },
       { id: 'past', dueAt: '2026-11-21T12:00:00.000Z' },
       { id: 'soon', dueAt: '2026-11-23T12:00:00.000Z' },
+      { id: 'next-a', dueAt: '2026-11-30T12:00:00.000Z' },
+      { id: 'next-b', dueAt: '2026-12-01T12:00:00.000Z' },
+      { id: 'next-c', dueAt: '2026-12-02T12:00:00.000Z' },
+      { id: 'next-d', dueAt: '2026-12-03T12:00:00.000Z' },
       { id: 'no-date', dueAt: null },
       { id: 'invalid', dueAt: 'not-a-date' },
     ],
@@ -28,7 +32,8 @@ test('instructor dashboard groups pending work, upcoming deadlines, and course e
   }, now);
 
   assert.deepEqual(model.reviewQueue.map(({ id }) => id), ['pending-a', 'pending-b']);
-  assert.deepEqual(model.upcomingAssignments.map(({ id }) => id), ['soon', 'later']);
+  assert.deepEqual(model.upcomingAssignments.map(({ id }) => id), ['soon', 'later', 'next-a', 'next-b', 'next-c']);
+  assert.equal(model.allUpcomingAssignments.length, 6);
   assert.equal(model.dueThisWeekCount, 2);
   assert.equal(model.pendingSubmissions.length, 2);
   assert.equal(model.enrollmentCount, 30);

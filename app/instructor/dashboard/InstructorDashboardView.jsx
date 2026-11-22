@@ -23,13 +23,37 @@ function formatDeadline(value) {
   };
 }
 
-function DashboardHeader({ staff, loading, onRefresh }) {
+const PAGE_HEADERS = {
+  overview: {
+    title: (staff) => staff ? `Welcome back, ${staff.name}` : 'Your teaching overview',
+    description: 'See your teaching activity and open a workspace.',
+  },
+  tools: {
+    title: () => 'Teaching tools',
+    description: 'Choose a course to create assignments, quizzes, lessons, or manage grades and attendance.',
+  },
+  review: {
+    title: () => 'Submissions to review',
+    description: 'Review and grade student work across your assigned courses.',
+  },
+  courses: {
+    title: () => 'My courses',
+    description: 'Open a course workspace to manage its students and learning activities.',
+  },
+  deadlines: {
+    title: () => 'Upcoming deadlines',
+    description: 'See assignment deadlines across your assigned courses.',
+  },
+};
+
+function DashboardHeader({ staff, loading, onRefresh, section }) {
+  const header = PAGE_HEADERS[section] || PAGE_HEADERS.overview;
   return (
     <header className="ap-instructor-header">
       <div>
         <p className="ap-eyebrow">MITA Academy · Instructor workspace</p>
-        <h1>{staff ? `Welcome back, ${staff.name}` : 'Your teaching overview'}</h1>
-        <p>See what needs attention and pick up where you left off.</p>
+        <h1>{header.title(staff)}</h1>
+        <p>{header.description}</p>
       </div>
       <button
         className="ap-button ap-instructor-refresh"
@@ -135,9 +159,9 @@ function ReviewQueue({ model, courses }) {
         </span>
       </div>
 
-      {model.reviewQueue.length ? (
+      {model.pendingSubmissions.length ? (
         <div className="ap-instructor-review-list">
-          {model.reviewQueue.map((submission) => {
+          {model.pendingSubmissions.map((submission) => {
             const course = courseById.get(submission.courseId);
             return (
               <article className="ap-instructor-review-row" key={submission.id}>
@@ -161,11 +185,6 @@ function ReviewQueue({ model, courses }) {
               </article>
             );
           })}
-          {model.pendingSubmissions.length > model.reviewQueue.length && (
-            <p className="ap-instructor-list-footer">
-              Showing the latest {model.reviewQueue.length} of {model.pendingSubmissions.length} submissions.
-            </p>
-          )}
         </div>
       ) : (
         <div className="ap-instructor-empty-state">
@@ -297,7 +316,31 @@ function DashboardLoading() {
   );
 }
 
-export default function InstructorDashboardView({ dashboard, loading, error, onRefresh }) {
+function DashboardNavigation() {
+  const destinations = [
+    { href: '/instructor/teaching-tools', title: 'Teaching tools', text: 'Create course activities and manage class sessions.', icon: 'T' },
+    { href: '/instructor/review', title: 'Needs review', text: 'Grade student submissions and leave feedback.', icon: 'R' },
+    { href: '/instructor/courses', title: 'My courses', text: 'Open your assigned course workspaces.', icon: 'C' },
+    { href: '/instructor/deadlines', title: 'Deadlines', text: 'Plan around upcoming assignment due dates.', icon: 'D' },
+  ];
+
+  return (
+    <nav className="ap-instructor-nav-grid" aria-label="Instructor workspaces">
+      {destinations.map((destination) => (
+        <Link className="ap-card ap-instructor-nav-card" href={destination.href} key={destination.href}>
+          <span aria-hidden="true">{destination.icon}</span>
+          <div>
+            <strong>{destination.title}</strong>
+            <small>{destination.text}</small>
+          </div>
+          <span className="ap-instructor-tool-arrow" aria-hidden="true">→</span>
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+export default function InstructorDashboardView({ dashboard, loading, error, onRefresh, section = 'overview' }) {
   const [selectedCourseId, setSelectedCourseId] = useState('');
   const model = useMemo(
     () => dashboard ? buildInstructorDashboardModel(dashboard) : null,
@@ -318,6 +361,7 @@ export default function InstructorDashboardView({ dashboard, loading, error, onR
         staff={dashboard?.staff}
         loading={loading}
         onRefresh={onRefresh}
+        section={section}
       />
 
       {error && (
@@ -331,48 +375,56 @@ export default function InstructorDashboardView({ dashboard, loading, error, onR
 
       {!dashboard ? loading ? <DashboardLoading /> : null : (
         <>
-          <section className="ap-instructor-summary-grid" aria-label="Teaching overview">
-            <SummaryCard
-              label="Assigned courses"
-              value={courseCount}
-              note="In your teaching workspace"
-              icon="C"
-              tone="is-blue"
-            />
-            <SummaryCard
-              label="Enrolled students"
-              value={model.enrollmentCount}
-              note="Across all assigned courses"
-              icon="S"
-              tone="is-teal"
-            />
-            <SummaryCard
-              label="To review"
-              value={model.pendingSubmissions.length}
-              note="Student submissions"
-              icon="R"
-              tone="is-amber"
-            />
-            <SummaryCard
-              label="Due this week"
-              value={model.dueThisWeekCount}
-              note="Assignment deadlines"
-              icon="D"
-              tone="is-violet"
-            />
-          </section>
+          {section === 'overview' && (
+            <>
+              <section className="ap-instructor-summary-grid" aria-label="Teaching overview">
+                <SummaryCard
+                  label="Assigned courses"
+                  value={courseCount}
+                  note="In your teaching workspace"
+                  icon="C"
+                  tone="is-blue"
+                />
+                <SummaryCard
+                  label="Enrolled students"
+                  value={model.enrollmentCount}
+                  note="Across all assigned courses"
+                  icon="S"
+                  tone="is-teal"
+                />
+                <SummaryCard
+                  label="To review"
+                  value={model.pendingSubmissions.length}
+                  note="Student submissions"
+                  icon="R"
+                  tone="is-amber"
+                />
+                <SummaryCard
+                  label="Due this week"
+                  value={model.dueThisWeekCount}
+                  note="Assignment deadlines"
+                  icon="D"
+                  tone="is-violet"
+                />
+              </section>
+              <DashboardNavigation />
+            </>
+          )}
 
-          <TeachingTools
-            courses={courses}
-            selectedCourseId={selectedCourseId}
-            onCourseChange={setSelectedCourseId}
-          />
+          {section === 'tools' && (
+            <TeachingTools
+              courses={courses}
+              selectedCourseId={selectedCourseId}
+              onCourseChange={setSelectedCourseId}
+            />
+          )}
+          {section === 'review' && <ReviewQueue model={model} courses={courses} />}
+          {section === 'deadlines' && (
+            <UpcomingDeadlines assignments={model.allUpcomingAssignments} courses={courses} />
+          )}
+          {section === 'courses' && <CourseOverview courses={courses} model={model} />}
 
-          <div className="ap-instructor-workspace-grid">
-            <div className="ap-instructor-main-column">
-              <ReviewQueue model={model} courses={courses} />
-              <UpcomingDeadlines assignments={model.upcomingAssignments} courses={courses} />
-            </div>
+          {section === 'overview' && (
             <aside className="ap-card ap-instructor-pulse" id="course-progress">
               <p className="ap-eyebrow">Classroom pulse</p>
               <h2>At a glance</h2>
@@ -398,11 +450,9 @@ export default function InstructorDashboardView({ dashboard, loading, error, onR
                   Assign a course to see its enrollment and review activity here.
                 </div>
               )}
-              <Link className="ap-link" href="#my-courses">View my courses <span aria-hidden="true">→</span></Link>
+              <Link className="ap-link" href="/instructor/courses">View my courses <span aria-hidden="true">→</span></Link>
             </aside>
-          </div>
-
-          <CourseOverview courses={courses} model={model} />
+          )}
         </>
       )}
     </main>
