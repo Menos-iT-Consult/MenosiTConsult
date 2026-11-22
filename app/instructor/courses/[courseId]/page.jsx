@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import InstructorQuizManager from '../InstructorQuizManager';
 
-const TABS = ['Overview', 'Assignments', 'Gradebook', 'Attendance', 'Lesson plans'];
+const TABS = ['Overview', 'Assignments', 'Quizzes', 'Gradebook', 'Attendance', 'Lesson plans'];
 const ATTENDANCE_STATUSES = [
   ['present', 'Present'],
   ['absent', 'Absent'],
@@ -374,11 +375,14 @@ export default function InstructorCoursePage() {
               <p>{submissions.filter((submission) => submission.score == null).length} submissions still need review.</p>
               <div className="ap-actions">
                 <button className="ap-button ap-button-primary" onClick={() => setTab('Assignments')}>Create assignment</button>
+                <button className="ap-button" onClick={() => setTab('Quizzes')}>Create quiz</button>
                 <button className="ap-button" onClick={() => setTab('Attendance')}>Take attendance</button>
               </div>
             </article>
           </section>
         )}
+
+        {tab === 'Quizzes' && <InstructorQuizManager courseId={courseId} sessions={sessions} />}
 
         {tab === 'Assignments' && (
           <section className="ap-section">

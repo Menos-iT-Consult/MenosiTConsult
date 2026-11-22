@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import useStudentPortalData from '../../useStudentPortalData';
 import EnrollCourseButton from '../EnrollCourseButton';
 import CourseLessons from '../CourseLessons';
+import QuizCenter from '../QuizCenter';
 
 function safeResourceUrl(value) {
   return typeof value === 'string' && (/^https?:\/\//i.test(value) || /^\/(?!\/)/.test(value));
@@ -100,6 +101,7 @@ export default function CourseDetailsPage() {
       </div>
 
       {courseLessons.length > 0 && <CourseLessons lessons={courseLessons} />}
+      <QuizCenter courseId={courseId} />
 
       <section className="ap-section">
         <div className="ap-card-heading"><h2>Course materials & assignments</h2></div>

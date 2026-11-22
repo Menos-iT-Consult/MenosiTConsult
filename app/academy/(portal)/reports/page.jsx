@@ -31,6 +31,7 @@ export default function StudentReportsPage() {
 
   const enrollments = data.enrollments || [];
   const exams = data.exams || [];
+  const quizResults = data.quizResults || [];
   const publishedGrades = enrollments.filter((enrollment) => enrollment.total != null);
 
   return (
@@ -83,6 +84,39 @@ export default function StudentReportsPage() {
         {enrollments.length > 0 && publishedGrades.length === 0 && (
           <p className="ap-muted ap-section">Grades will appear here after they are released by your instructors.</p>
         )}
+      </section>
+
+      <section className="ap-section">
+        <div className="ap-card-heading">
+          <h2>Quiz results</h2>
+          <span className="ap-muted">{quizResults.length} completed</span>
+        </div>
+        {quizResults.length ? (
+          <div className="ap-table-wrap ap-card">
+            <table className="ap-table">
+              <thead>
+                <tr>
+                  <th scope="col">Quiz</th>
+                  <th scope="col">Course</th>
+                  <th scope="col">Attempt</th>
+                  <th scope="col">Score</th>
+                  <th scope="col">Submitted</th>
+                </tr>
+              </thead>
+              <tbody>
+                {quizResults.map((result) => (
+                  <tr key={result.id}>
+                    <td>{result.title}</td>
+                    <td>{result.courseCode ? `${result.courseCode} · ` : ''}{result.courseTitle}</td>
+                    <td>{result.attemptNumber}</td>
+                    <td>{result.score}% ({result.correctCount} correct)</td>
+                    <td>{new Date(result.submittedAt).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : <div className="ap-card ap-empty"><p>Your submitted quiz results will appear here.</p></div>}
       </section>
 
       <section className="ap-section">

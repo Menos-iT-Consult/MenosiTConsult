@@ -133,6 +133,40 @@ async function ensureAcademySchema(query) {
   );`);
   await query(`CREATE UNIQUE INDEX IF NOT EXISTS academy_submissions_unique
     ON academy_submissions (assignment_id, student_id);`);
+  await query(`CREATE TABLE IF NOT EXISTS academy_quizzes (
+    id text PRIMARY KEY,
+    course_id text NOT NULL REFERENCES academy_courses(id) ON DELETE CASCADE,
+    session_id text NOT NULL REFERENCES academy_sessions(id) ON DELETE CASCADE,
+    title text NOT NULL,
+    description text NOT NULL DEFAULT '',
+    duration_minutes int NOT NULL CHECK (duration_minutes BETWEEN 1 AND 240),
+    max_attempts int NOT NULL DEFAULT 1 CHECK (max_attempts BETWEEN 1 AND 10),
+    opens_at timestamptz,
+    closes_at timestamptz,
+    questions jsonb NOT NULL,
+    published boolean NOT NULL DEFAULT false,
+    created_by text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+  );`);
+  await query(`CREATE INDEX IF NOT EXISTS academy_quizzes_course_session
+    ON academy_quizzes (course_id, session_id, published);`);
+  await query(`CREATE TABLE IF NOT EXISTS academy_quiz_attempts (
+    id text PRIMARY KEY,
+    quiz_id text NOT NULL REFERENCES academy_quizzes(id) ON DELETE CASCADE,
+    student_id text NOT NULL REFERENCES academy_students(id) ON DELETE CASCADE,
+    attempt_number int NOT NULL,
+    answers jsonb NOT NULL DEFAULT '{}'::jsonb,
+    score numeric(6,2),
+    correct_count int,
+    status text NOT NULL DEFAULT 'in_progress'
+      CHECK (status IN ('in_progress', 'submitted')),
+    started_at timestamptz NOT NULL DEFAULT now(),
+    submitted_at timestamptz,
+    UNIQUE (quiz_id, student_id, attempt_number)
+  );`);
+  await query(`CREATE INDEX IF NOT EXISTS academy_quiz_attempts_student
+    ON academy_quiz_attempts (student_id, quiz_id, started_at DESC);`);
   await query(`CREATE TABLE IF NOT EXISTS academy_timetable (
     id text PRIMARY KEY,
     session_id text, course_id text,

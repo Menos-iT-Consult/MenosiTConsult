@@ -2179,6 +2179,318 @@ async function setStudentLessonProgress(studentId, lessonId, completed) {
   return rows[0] ? { lessonId: rows[0].lesson_plan_id, completedAt: iso(rows[0].completed_at) } : null;
 }
 
+function mapQuiz(r) {
+  return {
+    id: r.id,
+    courseId: r.course_id,
+    sessionId: r.session_id,
+    title: r.title,
+    description: r.description || '',
+    durationMinutes: r.duration_minutes,
+    maxAttempts: r.max_attempts,
+    opensAt: r.opens_at ? iso(r.opens_at) : null,
+    closesAt: r.closes_at ? iso(r.closes_at) : null,
+    published: !!r.published,
+    questions: r.questions,
+    createdAt: r.created_at ? iso(r.created_at) : null,
+  };
+}
+
+async function listInstructorQuizzes(staffId, courseId) {
+  const { rows } = await q(
+    `SELECT q.*, a.id AS attempt_id, a.student_id, a.attempt_number, a.score,
+            a.correct_count, a.status AS attempt_status, a.started_at, a.submitted_at,
+            s.first_name, s.last_name, s.student_id AS student_number
+       FROM academy_quizzes q
+       JOIN academy_courses c ON c.id = q.course_id AND c.instructor_staff_id = $1
+       LEFT JOIN academy_quiz_attempts a ON a.quiz_id = q.id
+       LEFT JOIN academy_students s ON s.id = a.student_id
+      WHERE q.course_id = $2
+      ORDER BY q.created_at DESC, a.started_at DESC`,
+    [staffId, courseId]
+  );
+  const quizzes = new Map();
+  for (const row of rows) {
+    if (!quizzes.has(row.id)) quizzes.set(row.id, { ...mapQuiz(row), attempts: [] });
+    if (row.attempt_id) {
+      quizzes.get(row.id).attempts.push({
+        id: row.attempt_id,
+        studentId: row.student_id,
+        studentName: `${row.first_name || ''} ${row.last_name || ''}`.trim(),
+        studentNumber: row.student_number || '',
+        attemptNumber: row.attempt_number,
+        score: row.score == null ? null : Number(row.score),
+        correctCount: row.correct_count,
+        status: row.attempt_status,
+        startedAt: iso(row.started_at),
+        submittedAt: row.submitted_at ? iso(row.submitted_at) : null,
+      });
+    }
+  }
+  return [...quizzes.values()];
+}
+
+async function createInstructorQuiz(staffId, quiz) {
+  const id = newId('quiz');
+  const { rows } = await q(
+    `INSERT INTO academy_quizzes
+       (id, course_id, session_id, title, description, duration_minutes,
+        max_attempts, opens_at, closes_at, questions, published, created_by)
+     SELECT $1, c.id, s.id, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $2
+       FROM academy_courses c
+       JOIN academy_sessions s ON s.id = $3
+      WHERE c.id = $12 AND c.instructor_staff_id = $2
+     RETURNING *`,
+    [
+      id, staffId, quiz.sessionId, quiz.title, quiz.description, quiz.durationMinutes,
+      quiz.maxAttempts, quiz.opensAt, quiz.closesAt, JSON.stringify(quiz.questions),
+      quiz.published, quiz.courseId,
+    ]
+  );
+  return rows[0] ? mapQuiz(rows[0]) : null;
+}
+
+async function updateInstructorQuiz(staffId, quizId, quiz) {
+  const { rows } = await q(
+    `UPDATE academy_quizzes q
+        SET session_id = $4, title = $5, description = $6,
+            duration_minutes = $7, max_attempts = $8, opens_at = $9,
+            closes_at = $10, questions = $11::jsonb, updated_at = now()
+       FROM academy_courses c
+      WHERE q.id = $1 AND q.course_id = $2 AND c.id = q.course_id
+        AND c.instructor_staff_id = $3 AND q.published = false
+        AND NOT EXISTS (
+          SELECT 1 FROM academy_quiz_attempts a WHERE a.quiz_id = q.id
+        )
+     RETURNING q.*`,
+    [
+      quizId, quiz.courseId, staffId, quiz.sessionId, quiz.title, quiz.description,
+      quiz.durationMinutes, quiz.maxAttempts, quiz.opensAt, quiz.closesAt,
+      JSON.stringify(quiz.questions),
+    ]
+  );
+  return rows[0] ? mapQuiz(rows[0]) : null;
+}
+
+async function setInstructorQuizPublished(staffId, quizId, published) {
+  const { rows } = await q(
+    `WITH target AS (
+       SELECT q.id, q.published
+         FROM academy_quizzes q
+         JOIN academy_courses c ON c.id = q.course_id
+        WHERE q.id = $1 AND c.instructor_staff_id = $2
+        FOR UPDATE OF q
+     )
+     UPDATE academy_quizzes q SET published = $3, updated_at = now()
+       FROM target
+      WHERE q.id = target.id
+     RETURNING q.id, q.course_id, q.session_id, q.published,
+               target.published AS was_published`,
+    [quizId, staffId, published]
+  );
+  return rows[0] ? {
+    id: rows[0].id,
+    courseId: rows[0].course_id,
+    sessionId: rows[0].session_id,
+    published: rows[0].published,
+    wasPublished: rows[0].was_published,
+  } : null;
+}
+
+async function listStudentQuizzes(studentId, courseId) {
+  const { rows } = await q(
+    `SELECT q.id, q.course_id, q.session_id, q.title, q.description,
+            q.duration_minutes, q.max_attempts, q.opens_at, q.closes_at, q.questions,
+            a.id AS attempt_id, a.attempt_number, a.score, a.correct_count,
+            a.status AS attempt_status, a.started_at, a.submitted_at, a.answers
+       FROM academy_quizzes q
+       JOIN academy_enrollments e ON e.course_id = q.course_id
+         AND e.session_id = q.session_id AND e.student_id = $1
+         AND e.status IN ('enrolled', 'active')
+       LEFT JOIN academy_quiz_attempts a
+         ON a.quiz_id = q.id AND a.student_id = $1
+      WHERE q.course_id = $2 AND q.published = true
+      ORDER BY q.opens_at NULLS FIRST, q.created_at DESC, a.attempt_number`,
+    [studentId, courseId]
+  );
+  const quizzes = new Map();
+  for (const row of rows) {
+    if (!quizzes.has(row.id)) {
+      quizzes.set(row.id, {
+        id: row.id,
+        courseId: row.course_id,
+        sessionId: row.session_id,
+        title: row.title,
+        description: row.description || '',
+        durationMinutes: row.duration_minutes,
+        maxAttempts: row.max_attempts,
+        opensAt: row.opens_at ? iso(row.opens_at) : null,
+        closesAt: row.closes_at ? iso(row.closes_at) : null,
+        questions: row.questions,
+        attempts: [],
+      });
+    }
+    if (row.attempt_id) {
+      const attempt = {
+        id: row.attempt_id,
+        attemptNumber: row.attempt_number,
+        score: row.score == null ? null : Number(row.score),
+        correctCount: row.correct_count,
+        status: row.attempt_status,
+        startedAt: iso(row.started_at),
+        submittedAt: row.submitted_at ? iso(row.submitted_at) : null,
+      };
+      if (row.attempt_status === 'in_progress') {
+        quizzes.get(row.id).activeAttempt = { ...attempt, answers: row.answers || {} };
+      } else {
+        quizzes.get(row.id).attempts.push(attempt);
+      }
+    }
+  }
+  return [...quizzes.values()];
+}
+
+async function startStudentQuizAttempt(studentId, quizId) {
+  return transaction(async (client) => {
+    const { rows } = await client.query(
+      `SELECT q.* FROM academy_quizzes q
+        WHERE q.id = $1 AND q.published = true
+        FOR UPDATE`,
+      [quizId]
+    );
+    const quiz = rows[0];
+    if (!quiz) return { error: 'QUIZ_NOT_FOUND' };
+    const { rows: enrollmentRows } = await client.query(
+      `SELECT 1 FROM academy_enrollments
+        WHERE student_id = $1 AND course_id = $2 AND session_id = $3
+          AND status IN ('enrolled', 'active')
+        LIMIT 1`,
+      [studentId, quiz.course_id, quiz.session_id]
+    );
+    if (!enrollmentRows.length) return { error: 'NOT_ENROLLED' };
+    const now = Date.now();
+    if (quiz.opens_at && now < new Date(quiz.opens_at).getTime()) return { error: 'NOT_OPEN' };
+    if (quiz.closes_at && now >= new Date(quiz.closes_at).getTime()) return { error: 'CLOSED' };
+    const { rows: countRows } = await client.query(
+      `SELECT count(*)::int AS count FROM academy_quiz_attempts
+        WHERE quiz_id = $1 AND student_id = $2`,
+      [quizId, studentId]
+    );
+    const attemptNumber = countRows[0].count + 1;
+    if (attemptNumber > quiz.max_attempts) return { error: 'ATTEMPTS_EXHAUSTED' };
+    const id = newId('qat');
+    const { rows: attemptRows } = await client.query(
+      `INSERT INTO academy_quiz_attempts (id, quiz_id, student_id, attempt_number)
+       VALUES ($1, $2, $3, $4) RETURNING id, attempt_number, started_at`,
+      [id, quizId, studentId, attemptNumber]
+    );
+    return {
+      quiz: mapQuiz(quiz),
+      attempt: {
+        id: attemptRows[0].id,
+        attemptNumber: attemptRows[0].attempt_number,
+        startedAt: iso(attemptRows[0].started_at),
+      },
+    };
+  });
+}
+
+async function saveStudentQuizAnswers(studentId, attemptId, answers) {
+  return transaction(async (client) => {
+    const { rows } = await client.query(
+      `SELECT a.id, a.answers, a.status, a.started_at, q.questions,
+              q.duration_minutes, q.closes_at
+         FROM academy_quiz_attempts a
+         JOIN academy_quizzes q ON q.id = a.quiz_id
+        WHERE a.id = $1 AND a.student_id = $2
+        FOR UPDATE OF a`,
+      [attemptId, studentId]
+    );
+    const attempt = rows[0];
+    if (!attempt) return { error: 'ATTEMPT_NOT_FOUND' };
+    if (attempt.status !== 'in_progress') return { error: 'ATTEMPT_SUBMITTED' };
+    const deadline = Math.min(
+      new Date(attempt.started_at).getTime() + attempt.duration_minutes * 60000,
+      attempt.closes_at ? new Date(attempt.closes_at).getTime() : Infinity
+    );
+    if (Date.now() >= deadline) return { error: 'ATTEMPT_EXPIRED' };
+    const { sanitizeAnswers } = require('../lib/academy-quizzes');
+    const sanitized = sanitizeAnswers(attempt.questions, answers);
+    if (!sanitized) return { error: 'INVALID_ANSWERS' };
+    await client.query(
+      `UPDATE academy_quiz_attempts SET answers = $2::jsonb WHERE id = $1`,
+      [attemptId, JSON.stringify(sanitized)]
+    );
+    return { saved: true };
+  });
+}
+
+async function submitStudentQuizAttempt(studentId, attemptId, answers) {
+  return transaction(async (client) => {
+    const { rows } = await client.query(
+      `SELECT a.id, a.answers, a.status, a.started_at, q.questions,
+              q.duration_minutes, q.closes_at
+         FROM academy_quiz_attempts a
+         JOIN academy_quizzes q ON q.id = a.quiz_id
+        WHERE a.id = $1 AND a.student_id = $2
+        FOR UPDATE OF a`,
+      [attemptId, studentId]
+    );
+    const attempt = rows[0];
+    if (!attempt) return { error: 'ATTEMPT_NOT_FOUND' };
+    if (attempt.status !== 'in_progress') return { error: 'ATTEMPT_SUBMITTED' };
+    const deadline = Math.min(
+      new Date(attempt.started_at).getTime() + attempt.duration_minutes * 60000,
+      attempt.closes_at ? new Date(attempt.closes_at).getTime() : Infinity
+    );
+    const expired = Date.now() >= deadline;
+    const { scoreQuizAttempt } = require('../lib/academy-quizzes');
+    const score = scoreQuizAttempt(attempt.questions, expired ? attempt.answers : answers);
+    if (!score) return { error: 'INVALID_ANSWERS' };
+    const { rows: savedRows } = await client.query(
+      `UPDATE academy_quiz_attempts
+          SET answers = $2::jsonb, score = $3, correct_count = $4,
+              status = 'submitted', submitted_at = now()
+        WHERE id = $1
+        RETURNING submitted_at`,
+      [attemptId, JSON.stringify(score.answers), score.score, score.correctCount]
+    );
+    return {
+      score: score.score,
+      correctCount: score.correctCount,
+      totalQuestions: score.totalQuestions,
+      submittedAt: iso(savedRows[0].submitted_at),
+      expired,
+    };
+  });
+}
+
+async function listStudentQuizResults(studentId) {
+  const { rows } = await q(
+    `SELECT a.id, a.attempt_number, a.score, a.correct_count, a.submitted_at,
+            q.id AS quiz_id, q.title, q.course_id, c.code AS course_code,
+            c.title AS course_title
+       FROM academy_quiz_attempts a
+       JOIN academy_quizzes q ON q.id = a.quiz_id
+       JOIN academy_courses c ON c.id = q.course_id
+      WHERE a.student_id = $1 AND a.status = 'submitted'
+      ORDER BY a.submitted_at DESC`,
+    [studentId]
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    quizId: row.quiz_id,
+    title: row.title,
+    courseId: row.course_id,
+    courseCode: row.course_code,
+    courseTitle: row.course_title,
+    attemptNumber: row.attempt_number,
+    score: Number(row.score),
+    correctCount: row.correct_count,
+    submittedAt: iso(row.submitted_at),
+  }));
+}
+
 async function createInstructorLessonPlan(staffId, plan) {
   const { rows } = await q(
     `INSERT INTO academy_lesson_plans
@@ -3240,6 +3552,9 @@ module.exports = {
   listStudentAttendance, listInstructorAttendance, saveInstructorAttendance,
   listInstructorLessonPlans, listStudentLessons, setStudentLessonProgress, createInstructorLessonPlan,
   updateInstructorLessonPlan, deleteInstructorLessonPlan,
+  listInstructorQuizzes, createInstructorQuiz, updateInstructorQuiz, setInstructorQuizPublished,
+  listStudentQuizzes, startStudentQuizAttempt, saveStudentQuizAnswers,
+  submitStudentQuizAttempt, listStudentQuizResults,
   // timetable
   listTimetable, getTimetable, createTimetable, updateTimetable, deleteTimetable,
   // exams
