@@ -60,7 +60,7 @@ export default function ProgramCards() {
     return (
       <div className="academy-program-state">
         <p>There are no programs open for applications right now.</p>
-        <Link href="/contact">Contact the academy</Link>
+        <a href="https://menositconsult.com/contact">Contact the academy</a>
       </div>
     );
   }

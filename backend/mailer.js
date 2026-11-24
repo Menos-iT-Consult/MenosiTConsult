@@ -14,7 +14,7 @@
 const nodemailer = require('nodemailer');
 const db = require('./db');
 
-const SITE_URL = (process.env.SITE_URL || 'https://menositsolutions.vercel.app').replace(/\/$/, '');
+const SITE_URL = (process.env.SITE_URL || 'https://menositconsult.com').replace(/\/$/, '');
 const DEFAULT_MAIN_SMTP_FROM = 'support@menositconsult.com';
 
 function getMainFromAddress() {

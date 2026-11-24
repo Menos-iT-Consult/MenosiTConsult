@@ -4,12 +4,10 @@ const academy = require('../../../../../../../backend/academy-db');
 const staffAuth = require('../../../../../../../lib/academy-staff');
 const { noDbErrorResponse } = require('../../../../../../../lib/api-helpers');
 const { sendAndLogAdmissionNotification } = require('../../../../../../../lib/academy-admission-sms');
+const { getAcademySiteUrl } = require('../../../../../../../lib/academy-site-url');
 
 function getStudentPortalUrl(request) {
-  const siteUrl = process.env.SITE_URL ||
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    new URL(request.url).origin;
-  return new URL('/academy/login', siteUrl).toString();
+  return new URL('/academy/login', getAcademySiteUrl(request)).toString();
 }
 
 export async function POST(request, { params }) {

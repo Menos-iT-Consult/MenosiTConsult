@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAcademyDatabaseConfigError } from './lib/academy-db-config';
 const { verifySignedCookie } = require('./lib/signed-cookie-verification');
+const { shouldRewriteAcademyRoot } = require('./lib/academy-site-url');
 
 /**
  * Auth gate for /admin.
@@ -39,6 +40,15 @@ const ACADEMY_API_HANDLER_PATHS = new Set([
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
   const secret = process.env.SESSION_SECRET || '';
+
+  if (pathname === '/') {
+    if (shouldRewriteAcademyRoot(request.nextUrl.hostname, pathname)) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/academy';
+      return NextResponse.rewrite(url);
+    }
+    return NextResponse.next();
+  }
 
   if (pathname.startsWith('/api/academy/')) {
     const academyDbConfigError = getAcademyDatabaseConfigError();
@@ -127,5 +137,5 @@ function redirect(request, path) {
 }
 
 export const config = {
-  matcher: ['/admin', '/admin/:path*', '/academy/:path*', '/api/academy/:path*', '/instructor', '/instructor/:path*'],
+  matcher: ['/', '/admin', '/admin/:path*', '/academy/:path*', '/api/academy/:path*', '/instructor', '/instructor/:path*'],
 };

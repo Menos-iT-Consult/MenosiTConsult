@@ -6,6 +6,7 @@ const invitations = require('../../../../../../../lib/academy-invitations');
 const { deliverInstructorInvitation } = require('../../../../../../../lib/academy-invitation-delivery');
 const { normalizeGhanaRecipient } = require('../../../../../../../lib/academy-sms');
 const { noDbErrorResponse } = require('../../../../../../../lib/api-helpers');
+const { getAcademySiteUrl } = require('../../../../../../../lib/academy-site-url');
 
 function deliveryError(delivery) {
   const failed = Object.entries(delivery)
@@ -45,11 +46,7 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: 'The instructor invitation is no longer pending.' }, { status: 409 });
     }
 
-    const siteUrl = (
-      process.env.SITE_URL ||
-      process.env.NEXT_PUBLIC_SITE_URL ||
-      new URL(request.url).origin
-    ).replace(/\/$/, '');
+    const siteUrl = getAcademySiteUrl(request);
     const setupUrl = `${siteUrl}/instructor/setup?token=${encodeURIComponent(invitation.token)}`;
     const delivery = await deliverInstructorInvitation(updated, setupUrl);
     if (!delivery.email.sent || !delivery.sms.sent) {

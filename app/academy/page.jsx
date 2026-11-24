@@ -220,7 +220,7 @@ export default function AcademyWelcomePage() {
           </Link>
           <p>Building practical skills for a connected world.</p>
           <div>
-            <Link href="/contact">Contact us</Link>
+            <a href="https://menositconsult.com/contact">Contact us</a>
             <Link href="/academy/terms">Terms</Link>
             <Link href="/academy/privacy">Privacy</Link>
             <a href="tel:+233549128384">+233 54 912 8384</a>

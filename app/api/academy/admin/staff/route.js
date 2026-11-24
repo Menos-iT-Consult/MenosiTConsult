@@ -6,15 +6,12 @@ const invitations = require('../../../../../lib/academy-invitations');
 const { deliverInstructorInvitation } = require('../../../../../lib/academy-invitation-delivery');
 const { normalizeGhanaRecipient } = require('../../../../../lib/academy-sms');
 const { noDbErrorResponse } = require('../../../../../lib/api-helpers');
+const { getAcademySiteUrl } = require('../../../../../lib/academy-site-url');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 async function deliverInvitation(request, staff, token) {
-  const siteUrl = (
-    process.env.SITE_URL ||
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    new URL(request.url).origin
-  ).replace(/\/$/, '');
+  const siteUrl = getAcademySiteUrl(request);
   const setupUrl = `${siteUrl}/instructor/setup?token=${encodeURIComponent(token)}`;
   return deliverInstructorInvitation(staff, setupUrl);
 }

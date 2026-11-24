@@ -7,7 +7,7 @@ export const metadata = {
   },
   description:
     'Menos iT Consult provides top-notch IT consulting services to small businesses in Ghana. Network design, cybersecurity, cloud solutions and more.',
-  metadataBase: new URL('https://menositsolutions.vercel.app'),
+  metadataBase: new URL('https://menositconsult.com'),
   openGraph: {
     type: 'website',
     siteName: 'Menos iT Consult',

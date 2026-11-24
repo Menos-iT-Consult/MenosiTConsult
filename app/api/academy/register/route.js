@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 const academy = require('../../../../backend/academy-db');
 const storage = require('../../../../backend/academy-r2');
 const { noDbErrorResponse } = require('../../../../lib/api-helpers');
+const { getAcademySiteUrl } = require('../../../../lib/academy-site-url');
 const { sendStudentNotification } = require('../../../../lib/academy-notifications');
 const { validatePassportPhoto } = require('../../../../lib/academy-passport-photo');
 const {
@@ -229,10 +230,7 @@ export async function POST(request) {
     });
     photoKey = '';
 
-    const portalUrl = new URL(
-      '/academy/login',
-      process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || new URL(request.url).origin
-    ).toString();
+    const portalUrl = new URL('/academy/login', getAcademySiteUrl(request)).toString();
     const name = [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ');
     const notifications = await sendStudentNotification(student, {
       type: 'application_received',

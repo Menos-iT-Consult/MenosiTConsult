@@ -83,7 +83,8 @@ node server.js    # API only, on PORT (default 3000)
 | `ACADEMY_SMTP_FROM` | optional | Visible From address for Academy email; defaults to `academy@menositconsult.com` |
 | `ACADEMY_MNOTIFY_API_KEY` | for Academy SMS | Private API key for the Academy's mNotify SMS integration |
 | `ACADEMY_MNOTIFY_SENDER` | for Academy SMS | mNotify-approved sender ID, up to 11 characters |
-| `SITE_URL` | optional | Public base URL used in instructor setup invitation links; defaults to the request origin |
+| `SITE_URL` | optional | Main website base URL used in main-site emails; defaults to `https://menositconsult.com` |
+| `ACADEMY_SITE_URL` | optional | Academy base URL used in Academy application, admission, and instructor invitation links; defaults to `https://academy.menositconsult.com` |
 | `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET` | for main-site media | Main-site Cloudflare R2 credentials and bucket |
 | `ACADEMY_R2_BUCKET` | optional | Separate Academy R2 bucket; must differ from `R2_BUCKET` and does not fall back to it |
 | `ACADEMY_R2_PUBLIC_BASE` | optional | Public base URL for Academy media in its separate bucket |
@@ -314,7 +315,23 @@ vercel          # links & deploys a preview
 vercel --prod   # production
 ```
 
-### 4. Database
+### 4. Connect the custom domain
+
+The production site uses **https://menositconsult.com** as its primary domain,
+and MITA Academy uses **https://academy.menositconsult.com**. In **Vercel →
+Project → Settings → Domains**, add both `menositconsult.com` and
+`academy.menositconsult.com` and configure the DNS records Vercel displays at
+your domain registrar. Requests to the Academy subdomain root open the Academy
+landing page; student and admin portal paths remain under `/academy`, and
+instructor paths remain under `/instructor`.
+
+Set `SITE_URL=https://menositconsult.com` and
+`ACADEMY_SITE_URL=https://academy.menositconsult.com` for Production, then
+redeploy. The variables keep main-site email links on the main domain and
+Academy application, admission, and instructor invitation links on the Academy
+subdomain.
+
+### 5. Database
 No migration step is required — the app creates and seeds the schema
 automatically on the first request after `POSTGRES_URL` is set. To seed ahead
 of time instead:
@@ -326,7 +343,7 @@ set ADMIN_PASSWORD=your-secure-password
 node migrate.js
 ```
 
-> **Login at `https://your-site.vercel.app/admin`** with `admin` / the
+> **Login at `https://menositconsult.com/admin`** with `admin` / the
 > `ADMIN_PASSWORD` you seeded.
 
 ---
