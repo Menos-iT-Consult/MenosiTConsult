@@ -24,7 +24,7 @@ export default function AcademyPortalLink({
   }, []);
 
   return (
-    <Link className={className} href={loggedIn ? '/academy/dashboard' : '/academy/login'}>
+    <Link className={className} href={loggedIn ? '/academy/dashboard' : '/student'}>
       {loggedIn ? signedInLabel : signedOutLabel}
     </Link>
   );

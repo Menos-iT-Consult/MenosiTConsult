@@ -230,7 +230,7 @@ export async function POST(request) {
     });
     photoKey = '';
 
-    const portalUrl = new URL('/academy/login', getAcademySiteUrl(request)).toString();
+    const portalUrl = new URL('/student', getAcademySiteUrl(request)).toString();
     const name = [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ');
     const notifications = await sendStudentNotification(student, {
       type: 'application_received',

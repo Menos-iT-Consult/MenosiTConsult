@@ -9,7 +9,7 @@ const PORTALS = {
     title: 'MITA Student',
     subtitle: 'Student portal',
     logout: '/api/academy/auth/logout',
-    login: '/academy/login',
+    login: '/student',
     links: [
       { href: '/academy/dashboard', label: 'Dashboard', icon: 'dashboard' },
       { href: '/academy/notifications', label: 'Notifications', icon: 'announcements' },
@@ -36,7 +36,7 @@ const PORTALS = {
     title: 'MITA Academy',
     subtitle: 'Administrator',
     logout: '/api/academy/staff/auth/logout',
-    login: '/academy/admin/login',
+    login: '/admin',
     links: [
       { href: '/academy/admin/admissions', label: 'Admissions', icon: 'admissions' },
       { href: '/academy/admin/students', label: 'Students', icon: 'students' },
@@ -53,7 +53,7 @@ const PORTALS = {
     title: 'MITA Academy',
     subtitle: 'Instructor portal',
     logout: '/api/academy/staff/auth/logout',
-    login: '/instructor/login',
+    login: '/instructor',
     links: [
       { href: '/instructor/dashboard', label: 'Dashboard', icon: 'dashboard' },
       { href: '/instructor/teaching-tools', label: 'Teaching tools', icon: 'assignments' },
@@ -184,9 +184,9 @@ function NavigationIcon({ name }) {
 }
 
 function isStandaloneRoute(portal, pathname) {
-  if (portal === 'admin') return pathname === '/academy/admin/login';
+  if (portal === 'admin') return pathname === '/academy/admin/login' || pathname === '/admin';
   if (portal === 'instructor') {
-    return pathname === '/instructor/login' || pathname === '/instructor/setup';
+    return pathname === '/instructor' || pathname === '/instructor/login' || pathname === '/instructor/setup';
   }
   return false;
 }

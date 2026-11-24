@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAcademyDatabaseConfigError } from './lib/academy-db-config';
 const { verifySignedCookie } = require('./lib/signed-cookie-verification');
-const { shouldRewriteAcademyRoot } = require('./lib/academy-site-url');
+const { isAcademyHostname, shouldRewriteAcademyRoot } = require('./lib/academy-site-url');
 
 /**
  * Auth gate for /admin.
@@ -40,14 +40,40 @@ const ACADEMY_API_HANDLER_PATHS = new Set([
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
   const secret = process.env.SESSION_SECRET || '';
+  const requestHostname = request.headers.get('host') || request.nextUrl.hostname;
+  const academyHostname = isAcademyHostname(requestHostname);
 
   if (pathname === '/') {
-    if (shouldRewriteAcademyRoot(request.nextUrl.hostname, pathname)) {
+    if (shouldRewriteAcademyRoot(requestHostname, pathname)) {
       const url = request.nextUrl.clone();
       url.pathname = '/academy';
       return NextResponse.rewrite(url);
     }
     return NextResponse.next();
+  }
+
+  if (pathname === '/student') {
+    if (await signedCookieValid(request, 'academy_student', secret)) {
+      return redirect(request, '/academy/dashboard');
+    }
+    return rewrite(request, '/academy/login');
+  }
+  if (pathname === '/academy/login' && academyHostname) {
+    return redirect(request, '/student');
+  }
+
+  if (pathname === '/admin' && academyHostname) {
+    return rewrite(request, '/academy/admin/login');
+  }
+  if (pathname === '/academy/admin/login' && academyHostname) {
+    return redirect(request, '/admin');
+  }
+
+  if (pathname === '/instructor') {
+    return rewrite(request, '/instructor/login');
+  }
+  if (pathname === '/instructor/login') {
+    return redirect(request, '/instructor');
   }
 
   if (pathname.startsWith('/api/academy/')) {
@@ -74,7 +100,7 @@ export async function middleware(request) {
   if (pathname === '/academy/admin' || pathname.startsWith('/academy/admin/')) {
     const valid = await signedCookieValid(request, 'academy_staff', secret);
     if (valid) return NextResponse.next();
-    return redirect(request, '/academy/admin/login');
+    return redirect(request, academyHostname ? '/admin' : '/academy/admin/login');
   }
 
   // ── Academy student portal ────────────────────────────────────────────────
@@ -89,7 +115,7 @@ export async function middleware(request) {
   if (pathname === '/instructor' || pathname.startsWith('/instructor/')) {
     const valid = await signedCookieValid(request, 'academy_staff', secret);
     if (valid) return NextResponse.next();
-    return redirect(request, '/instructor/login');
+    return redirect(request, '/instructor');
   }
 
   if (
@@ -106,7 +132,7 @@ export async function middleware(request) {
   if (pathname === '/academy' || pathname.startsWith('/academy/')) {
     const valid = await signedCookieValid(request, 'academy_student', secret);
     if (valid) return NextResponse.next();
-    return redirect(request, '/academy/login');
+    return redirect(request, academyHostname ? '/student' : '/academy/login');
   }
 
   // ── Site admin (existing gate, unchanged) ─────────────────────────────────
@@ -136,6 +162,12 @@ function redirect(request, path) {
   return NextResponse.redirect(url);
 }
 
+function rewrite(request, path) {
+  const url = request.nextUrl.clone();
+  url.pathname = path;
+  return NextResponse.rewrite(url);
+}
+
 export const config = {
-  matcher: ['/', '/admin', '/admin/:path*', '/academy/:path*', '/api/academy/:path*', '/instructor', '/instructor/:path*'],
+  matcher: ['/', '/admin', '/admin/:path*', '/academy/:path*', '/api/academy/:path*', '/instructor', '/instructor/:path*', '/student'],
 };

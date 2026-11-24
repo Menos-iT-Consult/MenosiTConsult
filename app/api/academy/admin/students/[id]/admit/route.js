@@ -7,7 +7,7 @@ const { sendAndLogAdmissionNotification } = require('../../../../../../../lib/ac
 const { getAcademySiteUrl } = require('../../../../../../../lib/academy-site-url');
 
 function getStudentPortalUrl(request) {
-  return new URL('/academy/login', getAcademySiteUrl(request)).toString();
+  return new URL('/student', getAcademySiteUrl(request)).toString();
 }
 
 export async function POST(request, { params }) {

@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
   DEFAULT_ACADEMY_SITE_URL,
   getAcademySiteUrl,
+  isAcademyHostname,
   shouldRewriteAcademyRoot,
 } = require('../lib/academy-site-url');
 
@@ -50,4 +51,25 @@ test('only the Academy subdomain root is rewritten to the Academy landing page',
   assert.equal(shouldRewriteAcademyRoot('ACADEMY.MENOSITCONSULT.COM', '/'), true);
   assert.equal(shouldRewriteAcademyRoot('menositconsult.com', '/'), false);
   assert.equal(shouldRewriteAcademyRoot('academy.menositconsult.com', '/login'), false);
+});
+
+test('Academy login aliases are scoped to the configured Academy hostname', () => {
+  const original = process.env.ACADEMY_SITE_URL;
+  const originalPublic = process.env.NEXT_PUBLIC_ACADEMY_SITE_URL;
+  try {
+    delete process.env.ACADEMY_SITE_URL;
+    delete process.env.NEXT_PUBLIC_ACADEMY_SITE_URL;
+    assert.equal(isAcademyHostname('academy.menositconsult.com'), true);
+    assert.equal(isAcademyHostname('academy.menositconsult.com:3038'), true);
+    assert.equal(isAcademyHostname('menositconsult.com'), false);
+
+    process.env.ACADEMY_SITE_URL = 'https://academy.example.test/path';
+    assert.equal(isAcademyHostname('academy.example.test'), true);
+    assert.equal(isAcademyHostname('academy.menositconsult.com'), false);
+  } finally {
+    if (original === undefined) delete process.env.ACADEMY_SITE_URL;
+    else process.env.ACADEMY_SITE_URL = original;
+    if (originalPublic === undefined) delete process.env.NEXT_PUBLIC_ACADEMY_SITE_URL;
+    else process.env.NEXT_PUBLIC_ACADEMY_SITE_URL = originalPublic;
+  }
 });

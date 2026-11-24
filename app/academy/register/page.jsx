@@ -298,7 +298,7 @@ export default function AcademyApplicationPage() {
             <p>Submitting an application is not an admission confirmation. You can review your answers before submitting.</p>
           </div>
           <p className="academy-application-help">
-            Already admitted? <Link href="/academy/login">Sign in to the student portal</Link>.
+            Already admitted? <Link href="/student">Sign in to the student portal</Link>.
           </p>
         </aside>
 

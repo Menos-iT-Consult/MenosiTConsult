@@ -55,7 +55,7 @@ export default function InstructorSetupPage() {
         {error && <div className="ap-error" role="alert">{error}</div>}
         {complete ? (
           <div className="ap-success" role="status">
-            Your account is active. <Link href="/instructor/login">Sign in</Link>
+            Your account is active. <Link href="/instructor">Sign in</Link>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="ap-login-form">
