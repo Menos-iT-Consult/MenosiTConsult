@@ -311,33 +311,6 @@
 .academy-hero-media-orbit-one { top: 12%; right: 8%; }
 .academy-hero-media-orbit-two { top: 19%; right: 15%; width: 150px; border-style: dashed; animation-direction: reverse; animation-duration: 32s; }
 
-.academy-hero-media-label {
-  position: absolute;
-  top: 22px;
-  left: 22px;
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  padding: 9px 12px;
-  border: 1px solid rgba(255, 255, 255, .28);
-  border-radius: 999px;
-  color: #fff;
-  background: rgba(12, 31, 54, .58);
-  font-size: .64rem;
-  font-weight: 800;
-  letter-spacing: .12em;
-  backdrop-filter: blur(12px);
-}
-
-.academy-hero-live-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #5de0c0;
-  box-shadow: 0 0 0 4px rgba(93, 224, 192, .16);
-  animation: academy-pulse 2s ease-in-out infinite;
-}
-
 .academy-hero-media-caption {
   position: absolute;
   right: 24px;
@@ -370,45 +343,6 @@
   color: #a7b9ce;
   font-size: .62rem;
 }
-
-.academy-float-card {
-  position: absolute;
-  display: flex;
-  min-width: 220px;
-  align-items: center;
-  gap: 11px;
-  padding: 12px 15px;
-  border: 1px solid rgba(255, 255, 255, .12);
-  border-radius: 12px;
-  color: #fff;
-  background: rgba(20, 42, 69, .84);
-  box-shadow: 0 16px 38px rgba(0, 0, 0, .24);
-  backdrop-filter: blur(12px);
-  animation: academy-float 5s ease-in-out infinite;
-}
-
-.academy-float-card > span:last-child {
-  display: grid;
-  gap: 4px;
-}
-
-.academy-float-card strong { font-size: .78rem; }
-.academy-float-card small { color: #9fb0c4; font-size: .68rem; }
-.academy-float-icon {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 10px;
-  color: #a8c9ff;
-  background: rgba(64, 117, 202, .2);
-  font-size: .66rem;
-  font-weight: 800;
-}
-.academy-float-icon-green { color: #00a1fc; background: rgba(0, 161, 252, .14); }
-.academy-float-card-one { top: 23%; left: -7%; animation-delay: -.8s; }
-.academy-float-card-two { top: 54%; right: -7%; animation-delay: -2.7s; }
 
 .academy-about-photo {
   position: relative;
@@ -918,15 +852,6 @@
   to { transform: rotate(360deg); }
 }
 
-@keyframes academy-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
-}
-
-@keyframes academy-pulse {
-  50% { box-shadow: 0 0 0 7px rgba(93, 224, 192, .04); }
-}
-
 @keyframes academy-rise-in {
   from { opacity: 0; transform: translateY(18px); }
   to { opacity: 1; transform: translateY(0); }
@@ -944,8 +869,6 @@
 @media (prefers-reduced-motion: reduce) {
   .academy-hero-media,
   .academy-hero-media-orbit,
-  .academy-hero-live-dot,
-  .academy-float-card,
   .academy-program-card {
     animation: none;
   }
@@ -957,9 +880,6 @@
   .academy-main-nav { gap: 18px; }
   .academy-hero-grid { grid-template-columns: 1fr .8fr; gap: 12px; }
   .academy-hero-media { min-height: 420px; }
-  .academy-float-card { min-width: 190px; }
-  .academy-float-card-one { left: -4%; }
-  .academy-float-card-two { right: -4%; }
   .academy-section-heading { align-items: flex-start; flex-direction: column; gap: 15px; }
   .academy-about-grid { gap: 45px; }
   .academy-application-layout { gap: 40px; }
@@ -987,16 +907,9 @@
   .academy-hero-note { align-items: flex-start; margin-top: 24px; line-height: 1.5; }
   .academy-hero-media { min-height: 350px; margin: 10px 0 18px; }
   .academy-hero-video, .academy-hero-media-shade, .academy-hero-media-grid { border-radius: 20px; }
-  .academy-hero-media-label { top: 14px; left: 14px; padding: 8px 10px; font-size: .58rem; }
   .academy-hero-media-caption { right: 17px; bottom: 18px; left: 17px; }
   .academy-hero-media-caption strong { max-width: 260px; font-size: 1.45rem; }
   .academy-stock-caption { right: 5px; bottom: -18px; }
-  .academy-float-card { min-width: 0; gap: 8px; padding: 8px 10px; }
-  .academy-float-card strong { font-size: .68rem; }
-  .academy-float-card small { font-size: .6rem; }
-  .academy-float-card-one { top: 21%; left: -5px; }
-  .academy-float-card-two { top: 53%; right: -5px; }
-  .academy-float-icon { width: 30px; height: 30px; }
   .academy-hero-media-orbit-one { top: 10%; right: 5%; width: 170px; }
   .academy-hero-media-orbit-two { top: 17%; right: 12%; width: 110px; }
   .academy-hero-bottom-inner { min-height: 54px; font-size: .68rem; }

@@ -101,21 +101,9 @@ export default function AcademyWelcomePage() {
             <div className="academy-hero-media-grid" aria-hidden="true" />
             <div className="academy-hero-media-orbit academy-hero-media-orbit-one" aria-hidden="true" />
             <div className="academy-hero-media-orbit academy-hero-media-orbit-two" aria-hidden="true" />
-            <div className="academy-hero-media-label">
-              <span className="academy-hero-live-dot" />
-              PRACTICAL LEARNING
-            </div>
             <div className="academy-hero-media-caption">
               <span>Explore · Learn · Grow</span>
               <strong>Build skills for what comes next.</strong>
-            </div>
-            <div className="academy-float-card academy-float-card-one">
-              <span className="academy-float-icon">01</span>
-              <span><strong>Network engineering</strong><small>Connect what matters</small></span>
-            </div>
-            <div className="academy-float-card academy-float-card-two">
-              <span className="academy-float-icon academy-float-icon-green">02</span>
-              <span><strong>Cybersecurity</strong><small>Protect the digital world</small></span>
             </div>
             <figcaption className="academy-stock-caption">Representative stock footage · Pexels</figcaption>
           </figure>
