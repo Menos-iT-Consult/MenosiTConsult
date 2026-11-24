@@ -2,6 +2,12 @@ const express = require('express');
 const bcrypt  = require('bcryptjs');
 const crypto  = require('crypto');
 const db      = require('../db');
+const academy = require('../academy-db');
+const {
+  createLoginProtectionKeys,
+  getClientIp,
+  loginProtectionResponse,
+} = require('../../lib/academy-login-rate-limit');
 const router  = express.Router();
 
 const PROD        = process.env.NODE_ENV === 'production';
@@ -45,11 +51,34 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ error: 'Username and password are required.' });
   }
   try {
+    if (!process.env.SESSION_SECRET) {
+      return res.status(503).json({ error: 'Sign-in is temporarily unavailable.' });
+    }
+
+    const protectionKeys = createLoginProtectionKeys({
+      accountType: 'admin',
+      account: String(username),
+      clientIp: getClientIp(req),
+      secret: process.env.SESSION_SECRET,
+    });
+    let protection = null;
+    try {
+      protection = await academy.reserveAcademyLoginAttempts(protectionKeys);
+    } catch (limitError) {
+      if (!limitError.noDb) throw limitError;
+    }
+    if (protection && !protection.allowed) {
+      const blocked = loginProtectionResponse(protection.retryAfterSeconds);
+      res.set('Retry-After', String(blocked.seconds));
+      return res.status(429).json({ error: blocked.message });
+    }
+
     const ok = await verifyAdmin(String(username), password);
     if (!ok) {
       return res.status(401).json({ error: 'Invalid username or password.' });
     }
     res.cookie('admin_auth', 'true', { signed: true, ...COOKIE_OPTS });
+    if (protection) await academy.clearAcademyLoginAttempts(protectionKeys);
     res.json({ success: true });
   } catch (err) {
     console.error('Login error:', err);

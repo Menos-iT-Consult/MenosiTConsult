@@ -7,7 +7,10 @@ const {
   LOGIN_RATE_LIMIT_WINDOW_SECONDS,
   STUDENT_LOGIN_MAX_ATTEMPTS,
   STUDENT_LOGIN_IP_MAX_ATTEMPTS,
+  STAFF_LOGIN_MAX_ATTEMPTS,
+  ADMIN_LOGIN_MAX_ATTEMPTS,
   createStudentLoginRateLimitKeys,
+  createLoginProtectionKeys,
   getClientIp,
 } = require('../lib/academy-login-rate-limit');
 
@@ -55,6 +58,40 @@ test('student login rate limiting trusts valid proxy IP headers and ignores malf
   assert.equal(getClientIp(new Request('https://academy.example.test', {
     headers: { 'x-real-ip': 'spoofed', 'x-forwarded-for': 'also-spoofed' },
   })), null);
+});
+
+test('login protection keys normalize staff and administrator accounts and use account/IP limits', () => {
+  const staffKeys = createLoginProtectionKeys({
+    accountType: 'staff',
+    account: '  Instructor.Example@Mita.Academy  ',
+    clientIp: '203.0.113.42',
+    secret: 'test-secret',
+  });
+  const adminKeys = createLoginProtectionKeys({
+    accountType: 'admin',
+    account: 'Admin',
+    clientIp: '203.0.113.42',
+    secret: 'test-secret',
+  });
+
+  assert.equal(staffKeys.length, 2);
+  assert.deepEqual(staffKeys.map(({ limit }) => limit), [
+    STAFF_LOGIN_MAX_ATTEMPTS,
+    STUDENT_LOGIN_IP_MAX_ATTEMPTS,
+  ]);
+  assert.deepEqual(adminKeys.map(({ limit }) => limit), [
+    ADMIN_LOGIN_MAX_ATTEMPTS,
+    STUDENT_LOGIN_IP_MAX_ATTEMPTS,
+  ]);
+  assert.equal(staffKeys[0].windowSeconds, LOGIN_RATE_LIMIT_WINDOW_SECONDS);
+  assert.notEqual(staffKeys[0].keyHash, adminKeys[0].keyHash);
+  assert.ok(staffKeys.every(({ keyHash }) => /^[a-f0-9]{64}$/.test(keyHash)));
+  assert.throws(() => createLoginProtectionKeys({
+    accountType: 'unsupported',
+    account: 'identity',
+    clientIp: null,
+    secret: 'test-secret',
+  }), /supported account type/);
 });
 
 test('Academy schema creates persistent login rate-limit storage', async () => {

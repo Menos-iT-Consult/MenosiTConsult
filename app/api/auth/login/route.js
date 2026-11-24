@@ -4,6 +4,12 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { sign } = require('cookie-signature');
 const db = require('../../../../backend/db');
+const academy = require('../../../../backend/academy-db');
+const {
+  createLoginProtectionKeys,
+  getClientIp,
+  loginProtectionResponse,
+} = require('../../../../lib/academy-login-rate-limit');
 
 const PROD = process.env.NODE_ENV === 'production';
 const ENV_USER = process.env.ADMIN_USERNAME || 'admin';
@@ -35,6 +41,30 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Username and password are required.' }, { status: 400 });
   }
   try {
+    if (!process.env.SESSION_SECRET) {
+      return NextResponse.json({ error: 'Sign-in is temporarily unavailable.' }, { status: 503 });
+    }
+
+    const protectionKeys = createLoginProtectionKeys({
+      accountType: 'admin',
+      account: String(username),
+      clientIp: getClientIp(request),
+      secret: process.env.SESSION_SECRET,
+    });
+    let protection = null;
+    try {
+      protection = await academy.reserveAcademyLoginAttempts(protectionKeys);
+    } catch (limitError) {
+      if (!limitError.noDb) throw limitError;
+    }
+    if (protection && !protection.allowed) {
+      const blocked = loginProtectionResponse(protection.retryAfterSeconds);
+      return NextResponse.json(
+        { error: blocked.message },
+        { status: 429, headers: { 'Retry-After': String(blocked.seconds) } }
+      );
+    }
+
     const ok = await verifyAdmin(String(username), password);
     if (!ok) {
       return NextResponse.json({ error: 'Invalid username or password.' }, { status: 401 });
@@ -49,6 +79,7 @@ export async function POST(request) {
       path: '/',
       maxAge: 8 * 60 * 60,
     });
+    if (protection) await academy.clearAcademyLoginAttempts(protectionKeys);
     return response;
   } catch (err) {
     console.error('Login error:', err);
