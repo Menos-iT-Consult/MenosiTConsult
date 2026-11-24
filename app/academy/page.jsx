@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import ProgramCards from './ProgramCards';
 import AcademyPortalLink from './AcademyPortalLink';
+import AcademyHeroMedia from './AcademyHeroMedia';
 
 export const metadata = {
   title: 'MITA IT Academy | Practical Technology Training',
@@ -90,21 +91,23 @@ export default function AcademyWelcomePage() {
             </div>
           </div>
 
-          <div className="academy-hero-art" aria-label="Network, security, and cloud technology">
-            <div className="academy-art-grid" />
-            <div className="academy-art-center">
-              <div className="academy-art-ring academy-art-ring-outer" />
-              <div className="academy-art-ring academy-art-ring-inner" />
-              <div className="academy-art-core">
-                <svg viewBox="0 0 64 64" aria-hidden="true">
-                  <path d="M32 7 11 18v15c0 12.5 8.5 22 21 25 12.5-3 21-12.5 21-25V18L32 7Z" />
-                  <path d="m23 32 6 6 13-14" />
-                </svg>
-              </div>
-              <span className="academy-art-label academy-art-label-top">Learn</span>
-              <span className="academy-art-label academy-art-label-bottom">Build</span>
-              <span className="academy-art-dot academy-art-dot-one" />
-              <span className="academy-art-dot academy-art-dot-two" />
+          <figure className="academy-hero-media">
+            <AcademyHeroMedia
+              src="/assets/academy/computer-lab-learning.mp4"
+              poster="/assets/academy/computer-lab-learning-poster.jpg"
+              alt="Illustrative stock footage of students learning in a computer lab; not MITA students."
+            />
+            <div className="academy-hero-media-shade" aria-hidden="true" />
+            <div className="academy-hero-media-grid" aria-hidden="true" />
+            <div className="academy-hero-media-orbit academy-hero-media-orbit-one" aria-hidden="true" />
+            <div className="academy-hero-media-orbit academy-hero-media-orbit-two" aria-hidden="true" />
+            <div className="academy-hero-media-label">
+              <span className="academy-hero-live-dot" />
+              PRACTICAL LEARNING
+            </div>
+            <div className="academy-hero-media-caption">
+              <span>Explore · Learn · Grow</span>
+              <strong>Build skills for what comes next.</strong>
             </div>
             <div className="academy-float-card academy-float-card-one">
               <span className="academy-float-icon">01</span>
@@ -114,11 +117,8 @@ export default function AcademyWelcomePage() {
               <span className="academy-float-icon academy-float-icon-green">02</span>
               <span><strong>Cybersecurity</strong><small>Protect the digital world</small></span>
             </div>
-            <div className="academy-float-card academy-float-card-three">
-              <span className="academy-float-icon academy-float-icon-gold">03</span>
-              <span><strong>Cloud computing</strong><small>Make ideas scale</small></span>
-            </div>
-          </div>
+            <figcaption className="academy-stock-caption">Representative stock footage · Pexels</figcaption>
+          </figure>
         </div>
         <div className="academy-hero-bottom">
           <div className="academy-container academy-hero-bottom-inner">
@@ -155,6 +155,16 @@ export default function AcademyWelcomePage() {
             <Link className="academy-text-link" href="/academy/register">
               Take the first step <span aria-hidden="true">→</span>
             </Link>
+            <figure className="academy-about-photo">
+              <img
+                src="/assets/academy/student-study.jpg"
+                alt="Representative stock photo of a student reviewing course notes; not a MITA student."
+                loading="lazy"
+                width="1600"
+                height="900"
+              />
+              <figcaption>Curiosity grows when we learn together.</figcaption>
+            </figure>
           </div>
           <div className="academy-benefits">
             {benefits.map((benefit) => (

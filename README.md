@@ -331,6 +331,14 @@ redeploy. The variables keep main-site email links on the main domain and
 Academy application, admission, and instructor invitation links on the Academy
 subdomain.
 
+### Academy homepage media
+
+The homepage uses illustrative stock media, not footage or photos of MITA
+students. Video: [Legacy of Fire on Pexels](https://www.pexels.com/video/students-engaged-in-computer-lab-learning-31667523/).
+Photo: [Monstera Production on Pexels](https://www.pexels.com/photo/black-man-writing-in-notebook-while-doing-homework-6238107/).
+Both are used under the [Pexels License](https://www.pexels.com/license/), which
+allows free use without required attribution.
+
 ### 5. Database
 No migration step is required — the app creates and seeds the schema
 automatically on the first request after `POSTGRES_URL` is set. To seed ahead
