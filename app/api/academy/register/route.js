@@ -4,6 +4,7 @@ const academy = require('../../../../backend/academy-db');
 const storage = require('../../../../backend/academy-r2');
 const { noDbErrorResponse } = require('../../../../lib/api-helpers');
 const { getAcademySiteUrl } = require('../../../../lib/academy-site-url');
+const { ADMISSIONS_SETTING_KEY, isAdmissionsOpen } = require('../../../../lib/academy-admissions');
 const { sendStudentNotification } = require('../../../../lib/academy-notifications');
 const { validatePassportPhoto } = require('../../../../lib/academy-passport-photo');
 const {
@@ -29,6 +30,23 @@ const QUALIFICATIONS = new Set([
 // Creates a 'pending' student; staff admission issues credentials and sends
 // the Student ID and temporary password to the applicant by SMS.
 export async function POST(request) {
+  try {
+    if (!isAdmissionsOpen(await academy.getAcademySetting(ADMISSIONS_SETTING_KEY))) {
+      return NextResponse.json(
+        { error: 'Admissions are currently closed. Please check back later.' },
+        { status: 403 }
+      );
+    }
+  } catch (error) {
+    const noDb = noDbErrorResponse(error);
+    if (noDb) return noDb;
+    console.error('Academy admissions availability check error:', error);
+    return NextResponse.json(
+      { error: 'Could not verify whether admissions are open. Please try again later.' },
+      { status: 500 }
+    );
+  }
+
   const contentType = request.headers.get('content-type') || '';
   if (!contentType.toLowerCase().startsWith('multipart/form-data;')) {
     return NextResponse.json({ error: 'Submit the application with its required passport photo.' }, { status: 400 });

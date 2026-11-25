@@ -80,6 +80,7 @@ export default function AcademyApplicationPage() {
   const [programsLoading, setProgramsLoading] = useState(true);
   const [programsError, setProgramsError] = useState('');
   const [programsRetry, setProgramsRetry] = useState(0);
+  const [admissionsOpen, setAdmissionsOpen] = useState(null);
   const [form, setForm] = useState(INITIAL_FORM);
   const [passportPhoto, setPassportPhoto] = useState(null);
   const [passportPhotoPreview, setPassportPhotoPreview] = useState('');
@@ -97,15 +98,26 @@ export default function AcademyApplicationPage() {
       setProgramsLoading(true);
       setProgramsError('');
       try {
-        const response = await fetch('/api/academy/programs', { signal: controller.signal });
-        const result = await readJsonResponse(response);
-        if (!response.ok) throw new Error('Could not load available programs.');
-        if (!Array.isArray(result)) throw new Error('The available program list is invalid.');
-        setPrograms(result);
+        const [programsResponse, settingsResponse] = await Promise.all([
+          fetch('/api/academy/programs', { cache: 'no-store', signal: controller.signal }),
+          fetch('/api/academy/site-settings', { cache: 'no-store', signal: controller.signal }),
+        ]);
+        const [programsResult, settingsResult] = await Promise.all([
+          readJsonResponse(programsResponse),
+          readJsonResponse(settingsResponse),
+        ]);
+        if (!programsResponse.ok) throw new Error('Could not load available programs.');
+        if (!settingsResponse.ok) throw new Error('Could not check whether applications are open.');
+        if (!Array.isArray(programsResult)) throw new Error('The available program list is invalid.');
+        if (typeof settingsResult.admissionsOpen !== 'boolean') {
+          throw new Error('The admissions availability response is invalid.');
+        }
+        setPrograms(programsResult);
+        setAdmissionsOpen(settingsResult.admissionsOpen);
       } catch (loadError) {
         if (loadError.name !== 'AbortError') {
           console.error('Failed to load Academy application programs:', loadError);
-          setProgramsError('We could not load programs right now. Please try again.');
+          setProgramsError('We could not check admissions availability or load programs right now. Please try again.');
         }
       } finally {
         if (!controller.signal.aborted) setProgramsLoading(false);
@@ -312,6 +324,34 @@ export default function AcademyApplicationPage() {
                 Your application for <strong>{application.program}</strong> has been sent.
                 The admissions team will review it and contact you using the details provided.
               </p>
+              <Link className="academy-button" href="/academy">Back to MITA</Link>
+            </div>
+          ) : programsLoading ? (
+            <div className="academy-application-success" role="status">
+              <p className="academy-section-kicker">Admissions application</p>
+              <h2>Checking application availability…</h2>
+            </div>
+          ) : programsError ? (
+            <div className="academy-application-success" role="alert">
+              <p className="academy-section-kicker">Admissions application</p>
+              <h2>We can’t check application availability right now.</h2>
+              <p>{programsError}</p>
+              <button
+                className="academy-button"
+                type="button"
+                onClick={() => {
+                  setProgramsLoading(true);
+                  setProgramsRetry((current) => current + 1);
+                }}
+              >
+                Try again
+              </button>
+            </div>
+          ) : admissionsOpen === false ? (
+            <div className="academy-application-success" role="status">
+              <p className="academy-section-kicker">Admissions currently closed</p>
+              <h2>Applications are not open right now.</h2>
+              <p>Please check back later or <Link href="/academy/contact">contact the Academy</Link>.</p>
               <Link className="academy-button" href="/academy">Back to MITA</Link>
             </div>
           ) : (
@@ -664,21 +704,6 @@ export default function AcademyApplicationPage() {
                 {step === 3 && (
                   <fieldset className="academy-form-step">
                     <legend className="academy-sr-only">Program of interest</legend>
-                    {programsError && (
-                      <div className="academy-form-error" role="alert">
-                        <p>{programsError}</p>
-                        <button
-                          className="academy-retry-link"
-                          type="button"
-                          onClick={() => {
-                            setProgramsLoading(true);
-                            setProgramsRetry((current) => current + 1);
-                          }}
-                        >
-                          Try again
-                        </button>
-                      </div>
-                    )}
                     {!programsLoading && !programsError && programs.length === 0 && (
                       <p className="academy-program-empty" role="status">
                         There are no programs accepting applications right now. Please check back soon.

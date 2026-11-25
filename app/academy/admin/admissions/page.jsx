@@ -18,8 +18,10 @@ export default function AcademyAdmissionsAdminPage() {
   const router = useRouter();
   const [applications, setApplications] = useState([]);
   const [smsFailures, setSmsFailures] = useState([]);
+  const [admissionsOpen, setAdmissionsOpen] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState('');
+  const [savingAdmissionsStatus, setSavingAdmissionsStatus] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -27,15 +29,26 @@ export default function AcademyAdmissionsAdminPage() {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch('/api/academy/admin/students', { credentials: 'include' });
-      const result = await response.json();
-      if (response.status === 401) {
+      const [response, admissionsResponse] = await Promise.all([
+        fetch('/api/academy/admin/students', { credentials: 'include' }),
+        fetch('/api/academy/admin/admissions', { credentials: 'include', cache: 'no-store' }),
+      ]);
+      const [result, admissionsResult] = await Promise.all([
+        response.json(),
+        admissionsResponse.json(),
+      ]);
+      if (response.status === 401 || admissionsResponse.status === 401) {
         router.replace('/academy/admin/login');
         return;
       }
       if (!response.ok) throw new Error(result.error || 'Could not load admission applications.');
+      if (!admissionsResponse.ok) throw new Error(admissionsResult.error || 'Could not load admissions status.');
+      if (typeof admissionsResult.admissionsOpen !== 'boolean') {
+        throw new Error('The admissions status response is invalid.');
+      }
       setApplications(result.applications || []);
       setSmsFailures(result.smsFailures || []);
+      setAdmissionsOpen(admissionsResult.admissionsOpen);
     } catch (loadError) {
       setError(loadError.message || 'Could not load admission applications.');
     } finally {
@@ -44,6 +57,34 @@ export default function AcademyAdmissionsAdminPage() {
   }, [router]);
 
   useEffect(() => { loadApplications(); }, [loadApplications]);
+
+  async function updateAdmissionsStatus() {
+    const nextStatus = !admissionsOpen;
+    setSavingAdmissionsStatus(true);
+    setError('');
+    setNotice('');
+    try {
+      const response = await fetch('/api/academy/admin/admissions', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ admissionsOpen: nextStatus }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Could not update admissions status.');
+      if (typeof result.admissionsOpen !== 'boolean') {
+        throw new Error('The admissions status response is invalid.');
+      }
+      setAdmissionsOpen(result.admissionsOpen);
+      setNotice(result.admissionsOpen
+        ? 'Admissions are open. New applications can be submitted.'
+        : 'Admissions are closed. New applications are blocked; submitted applications remain available below.');
+    } catch (statusError) {
+      setError(statusError.message || 'Could not update admissions status.');
+    } finally {
+      setSavingAdmissionsStatus(false);
+    }
+  }
 
   async function approveAdmission(student) {
     if (!window.confirm(`Approve ${fullName(student)} and send the admission details by email and SMS?`)) return;
@@ -121,6 +162,36 @@ export default function AcademyAdmissionsAdminPage() {
 
         {error && <div className="ap-error" role="alert">{error}</div>}
         {notice && <div className="ap-success" role="status">{notice}</div>}
+
+        {!loading && admissionsOpen !== null && (
+          <section className="ap-card ap-section">
+            <div className="ap-card-heading">
+              <div>
+                <h2>Application intake</h2>
+                <p className="ap-muted">
+                  {admissionsOpen
+                    ? 'New applications are currently being accepted.'
+                    : 'New applications are currently blocked. Existing applications can still be reviewed.'}
+                </p>
+              </div>
+              <span className={`ap-chip ${admissionsOpen ? 'ap-chip-active' : 'ap-chip-neutral'}`}>
+                {admissionsOpen ? 'Open' : 'Closed'}
+              </span>
+            </div>
+            <button
+              className={`ap-button${admissionsOpen ? ' ap-button-danger' : ' ap-button-primary'}`}
+              type="button"
+              onClick={updateAdmissionsStatus}
+              disabled={savingAdmissionsStatus}
+            >
+              {savingAdmissionsStatus
+                ? 'Saving…'
+                : admissionsOpen
+                  ? 'Close admissions'
+                  : 'Open admissions'}
+            </button>
+          </section>
+        )}
 
         <section className="ap-section">
           <h2>Pending applications</h2>
