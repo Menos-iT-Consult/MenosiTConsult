@@ -53,17 +53,32 @@ function getAcademyMediaKey(value) {
     typeof key === 'string' &&
     /^academy\/media\/\d{4}\/[a-zA-Z0-9_-]+\.(jpg|jpeg|png|webp|gif|avif)$/i.test(key);
   if (isMediaKey(value)) return value;
+  if (typeof value !== 'string') return '';
 
   const base = publicBase();
-  if (!base || typeof value !== 'string') return '';
   try {
-    const baseUrl = new URL(base);
+    if (value.startsWith('/')) {
+      const relativePath = new URL(value, 'https://academy-media.invalid').pathname;
+      const key = decodeURIComponent(relativePath).replace(/^\/+/, '');
+      return isMediaKey(key) ? key : '';
+    }
+
     const valueUrl = new URL(value);
-    const basePath = baseUrl.pathname.replace(/\/+$/, '');
-    const pathPrefix = basePath ? `${basePath}/` : '/';
-    if (valueUrl.origin !== baseUrl.origin || !valueUrl.pathname.startsWith(pathPrefix)) return '';
-    const key = decodeURIComponent(valueUrl.pathname.slice(pathPrefix.length));
-    return isMediaKey(key) ? key : '';
+    if (base) {
+      const baseUrl = new URL(base);
+      const basePath = baseUrl.pathname.replace(/\/+$/, '');
+      const pathPrefix = basePath ? `${basePath}/` : '/';
+      if (valueUrl.origin === baseUrl.origin && valueUrl.pathname.startsWith(pathPrefix)) {
+        const key = decodeURIComponent(valueUrl.pathname.slice(pathPrefix.length));
+        if (isMediaKey(key)) return key;
+      }
+    }
+
+    if (valueUrl.protocol !== 'https:') return '';
+    // Older media URLs can use a CDN host that is no longer configured.
+    const path = decodeURIComponent(valueUrl.pathname);
+    const match = path.match(/(?:^|\/)(academy\/media\/\d{4}\/[a-zA-Z0-9_-]+\.(?:jpg|jpeg|png|webp|gif|avif))$/i);
+    return match && isMediaKey(match[1]) ? match[1] : '';
   } catch {
     return '';
   }
@@ -203,6 +218,22 @@ const PRIVATE_PHOTO_TYPES = {
 function isPrivatePhotoKey(key) {
   return typeof key === 'string' &&
     /^academy\/private\/student-photos\/\d{4}\/[a-f0-9]{40}\.(jpg|jpeg|png|webp)$/.test(key);
+}
+
+function getPrivatePhotoKey(value) {
+  if (isPrivatePhotoKey(value)) return value;
+  if (typeof value !== 'string') return '';
+  try {
+    const url = value.startsWith('/')
+      ? new URL(value, 'https://academy-photo.invalid')
+      : new URL(value);
+    if (!value.startsWith('/') && url.protocol !== 'https:') return '';
+    const path = decodeURIComponent(url.pathname);
+    const match = path.match(/(?:^|\/)(academy\/private\/student-photos\/\d{4}\/[a-f0-9]{40}\.(?:jpg|jpeg|png|webp))$/i);
+    return match && isPrivatePhotoKey(match[1]) ? match[1] : '';
+  } catch {
+    return '';
+  }
 }
 
 async function putPrivatePhoto(buffer, mime) {
@@ -377,6 +408,7 @@ module.exports = {
   getPrivatePdfBytes,
   deletePrivatePdf,
   isPrivatePhotoKey,
+  getPrivatePhotoKey,
   putPrivatePhoto,
   getPrivatePhoto,
   deletePrivatePhoto,

@@ -17,8 +17,9 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
     }
     let photo;
-    if (storage.isPrivatePhotoKey(student.photo)) {
-      photo = await storage.getPrivatePhoto(student.photo);
+    const privatePhotoKey = storage.getPrivatePhotoKey(student.photo);
+    if (privatePhotoKey) {
+      photo = await storage.getPrivatePhoto(privatePhotoKey);
     } else {
       const key = storage.getAcademyMediaKey(student.photo);
       if (!key) return NextResponse.json({ error: 'Passport photo not found.' }, { status: 404 });

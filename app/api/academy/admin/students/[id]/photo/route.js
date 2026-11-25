@@ -14,8 +14,9 @@ export async function GET(request, { params }) {
     const student = await academy.getStudent(id);
     if (!student) return NextResponse.json({ error: 'Student not found.' }, { status: 404 });
     let photo;
-    if (storage.isPrivatePhotoKey(student.photo)) {
-      photo = await storage.getPrivatePhoto(student.photo);
+    const privatePhotoKey = storage.getPrivatePhotoKey(student.photo);
+    if (privatePhotoKey) {
+      photo = await storage.getPrivatePhoto(privatePhotoKey);
     } else {
       const key = storage.getAcademyMediaKey(student.photo);
       if (!key) return NextResponse.json({ error: 'Passport photo not found.' }, { status: 404 });

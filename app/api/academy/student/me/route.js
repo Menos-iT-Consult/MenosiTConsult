@@ -37,7 +37,7 @@ export async function GET(request) {
     lastName: student.lastName,
     email: student.email,
     phone: student.phone,
-    photo: storage.isPrivatePhotoKey(student.photo) || storage.getAcademyMediaKey(student.photo)
+    photo: storage.getPrivatePhotoKey(student.photo) || storage.getAcademyMediaKey(student.photo)
       ? '/api/academy/student/photo'
       : student.photo,
     dob: student.dob,

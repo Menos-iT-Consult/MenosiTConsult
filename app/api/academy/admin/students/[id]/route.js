@@ -27,7 +27,7 @@ async function getDetails(id) {
   return {
     student: {
       ...student,
-      photo: storage.isPrivatePhotoKey(student.photo) || storage.getAcademyMediaKey(student.photo)
+      photo: storage.getPrivatePhotoKey(student.photo) || storage.getAcademyMediaKey(student.photo)
         ? `/api/academy/admin/students/${encodeURIComponent(student.id)}/photo`
         : student.photo,
     },

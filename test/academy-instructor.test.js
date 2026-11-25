@@ -207,9 +207,22 @@ test('Academy R2 requires its own bucket and rejects the main-site bucket', asyn
       academyR2.getAcademyMediaKey(`https://academy-media.example.test/${mediaKey}?cache=1`),
       mediaKey
     );
-    assert.equal(academyR2.getAcademyMediaKey(`https://other.example.test/${mediaKey}`), '');
+    assert.equal(academyR2.getAcademyMediaKey(`https://other.example.test/${mediaKey}`), mediaKey);
     assert.equal(academyR2.getAcademyMediaKey('academy/media/2026/../student.jpg'), '');
     assert.equal(academyR2.getAcademyMediaMime('academy/media/2026/photo.jpeg'), 'image/jpeg');
+
+    process.env.ACADEMY_R2_PUBLIC_BASE = '';
+    assert.equal(
+      academyR2.getAcademyMediaKey(`https://legacy-media.example.test/${mediaKey}?cache=1`),
+      mediaKey
+    );
+    assert.equal(academyR2.getAcademyMediaKey(`/${mediaKey}`), mediaKey);
+    assert.equal(academyR2.getAcademyMediaKey(`http://legacy-media.example.test/${mediaKey}`), '');
+    assert.equal(
+      academyR2.getAcademyMediaKey('https://legacy-media.example.test/academy/media/2026/../student.jpg'),
+      ''
+    );
+    process.env.ACADEMY_R2_PUBLIC_BASE = 'https://academy-media.example.test/';
 
     process.env.ACADEMY_CERTIFICATE_R2_BUCKET = 'ACADEMY-MEDIA';
     assert.equal(academyR2.certificateStorageEnabled(), false);
@@ -233,6 +246,14 @@ test('Academy R2 requires its own bucket and rejects the main-site bucket', asyn
       academyR2.isPrivatePhotoKey('academy/private/student-photos/2026/0123456789abcdef0123456789abcdef01234567.jpeg'),
       true
     );
+    const privatePhotoKey = 'academy/private/student-photos/2026/0123456789abcdef0123456789abcdef01234567.jpg';
+    assert.equal(academyR2.getPrivatePhotoKey(privatePhotoKey), privatePhotoKey);
+    assert.equal(
+      academyR2.getPrivatePhotoKey(`https://legacy-storage.example.test/${privatePhotoKey}?download=1`),
+      privatePhotoKey
+    );
+    assert.equal(academyR2.getPrivatePhotoKey(`/${privatePhotoKey}`), privatePhotoKey);
+    assert.equal(academyR2.getPrivatePhotoKey(`http://legacy-storage.example.test/${privatePhotoKey}`), '');
     assert.equal(academyR2.isPrivatePhotoKey('academy/media/2026/student.jpg'), false);
     await assert.rejects(
       academyR2.getPrivatePhoto('academy/media/2026/student.jpg'),
