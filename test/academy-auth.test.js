@@ -103,4 +103,8 @@ test('Academy schema creates persistent login rate-limit storage', async () => {
   assert.ok(queries.some((query) => query.includes('CREATE TABLE IF NOT EXISTS academy_login_rate_limits')));
   assert.ok(queries.some((query) => query.includes('academy_login_rate_limits_updated_at')));
   assert.ok(queries.some((query) => query.includes('ADD COLUMN IF NOT EXISTS photo text')));
+  assert.ok(queries.some((query) => (
+    query.includes('ALTER TABLE academy_timetable') &&
+    query.includes('ADD COLUMN IF NOT EXISTS created_by text')
+  )));
 });

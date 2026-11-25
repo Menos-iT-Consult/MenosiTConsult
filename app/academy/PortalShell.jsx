@@ -42,6 +42,7 @@ const PORTALS = {
       { href: '/academy/admin/students', label: 'Students', icon: 'students' },
       { href: '/academy/admin/programs', label: 'Programs & fees', icon: 'courses' },
       { href: '/academy/admin/instructors', label: 'Instructors & courses', icon: 'courses' },
+      { href: '/academy/admin/timetable', label: 'Timetable', icon: 'timetable' },
       { href: '/academy/admin/announcements', label: 'Announcements', icon: 'announcements' },
       { href: '/academy/admin/payments', label: 'Payment review', icon: 'fees' },
       { href: '/academy/admin/support', label: 'Student support', icon: 'support' },

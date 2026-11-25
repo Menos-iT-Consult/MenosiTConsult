@@ -2842,14 +2842,16 @@ async function createTimetable(t) {
 async function updateTimetable(id, t) {
   const { rows } = await q(
     `UPDATE academy_timetable
-         SET day_of_week = COALESCE($2, day_of_week),
-             course_id = COALESCE($3, course_id),
-             start_time = COALESCE($4, start_time),
-             end_time = COALESCE($5, end_time),
-             venue = COALESCE($6, venue)
+        SET session_id = COALESCE($2, session_id),
+            day_of_week = COALESCE($3, day_of_week),
+            course_id = COALESCE($4, course_id),
+            start_time = COALESCE($5, start_time),
+            end_time = COALESCE($6, end_time),
+            venue = COALESCE($7, venue)
        WHERE id = $1 RETURNING *`,
     [
       id,
+      t.sessionId,
       t.dayOfWeek,
       t.courseId,
       t.startTime,

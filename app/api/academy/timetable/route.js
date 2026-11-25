@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 const academy = require('../../../../backend/academy-db');
 const staffAuth = require('../../../../lib/academy-staff');
+const { noDbErrorResponse } = require('../../../../lib/api-helpers');
+const { validateTimetableEntry } = require('../../../../lib/academy-timetable-validation');
 const {
   sendStudentNotifications,
   summarizeStudentNotifications,
@@ -21,6 +23,8 @@ async function notifySchedule(students, timetable, course, type, action) {
 
 export async function GET(request) {
   try {
+    const gate = await staffAuth.requireAdministrator(request);
+    if (gate.error) return NextResponse.json({ error: gate.error }, { status: gate.status });
     const { searchParams } = new URL(request.url);
     const sessionId = searchParams.get('session_id');
     const courseId = searchParams.get('course_id');
@@ -35,6 +39,8 @@ export async function GET(request) {
     }
     return NextResponse.json(timetable);
   } catch (err) {
+    const noDb = noDbErrorResponse(err);
+    if (noDb) return noDb;
     console.error('Academy timetable error:', err);
     return NextResponse.json(
       { error: 'Could not load timetable.' },
@@ -48,22 +54,30 @@ export async function POST(request) {
     const gate = await staffAuth.requireAdministrator(request);
     if (gate.error) return NextResponse.json({ error: gate.error }, { status: gate.status });
     const body = await request.json().catch(() => ({}));
+    const validation = validateTimetableEntry(body);
+    if (validation.error) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+    const [sessions, selectedCourse] = await Promise.all([
+      academy.listSessions(),
+      academy.getCourse(validation.entry.courseId),
+    ]);
+    if (!sessions.some((session) => session.id === validation.entry.sessionId) || !selectedCourse) {
+      return NextResponse.json({ error: 'Choose an existing session and course.' }, { status: 400 });
+    }
     const timetable = await academy.createTimetable({
-      sessionId: body.sessionId,
-      courseId: body.courseId,
-      dayOfWeek: body.dayOfWeek,
-      startTime: body.startTime,
-      endTime: body.endTime,
-      venue: body.venue,
+      ...validation.entry,
       createdBy: gate.staff.id,
     });
     const [students, course] = await Promise.all([
       academy.listStudentsForCourseSession(timetable.course_id, timetable.session_id),
       academy.getCourse(timetable.course_id),
     ]);
-    const notifications = await notifySchedule(students, timetable, course, 'class_schedule_created', 'scheduled');
+    const notifications = await notifySchedule(students, timetable, course, 'class_schedule_created', 'created');
     return NextResponse.json({ ...timetable, notifications });
   } catch (err) {
+    const noDb = noDbErrorResponse(err);
+    if (noDb) return noDb;
     console.error('Academy timetable create error:', err);
     return NextResponse.json(
       { error: 'Could not create timetable entry.' },
@@ -80,15 +94,20 @@ export async function PUT(request) {
     if (typeof body.id !== 'string' || !body.id) {
       return NextResponse.json({ error: 'A timetable entry ID is required.' }, { status: 400 });
     }
+    const validation = validateTimetableEntry(body);
+    if (validation.error) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+    const [sessions, selectedCourse] = await Promise.all([
+      academy.listSessions(),
+      academy.getCourse(validation.entry.courseId),
+    ]);
+    if (!sessions.some((session) => session.id === validation.entry.sessionId) || !selectedCourse) {
+      return NextResponse.json({ error: 'Choose an existing session and course.' }, { status: 400 });
+    }
     const existing = await academy.getTimetable(body.id);
     if (!existing) return NextResponse.json({ error: 'Timetable entry not found.' }, { status: 404 });
-    const updated = await academy.updateTimetable(body.id, {
-      dayOfWeek: body.dayOfWeek,
-      courseId: body.courseId,
-      startTime: body.startTime,
-      endTime: body.endTime,
-      venue: body.venue,
-    });
+    const updated = await academy.updateTimetable(body.id, validation.entry);
     const audiences = await Promise.all([
       academy.listStudentsForCourseSession(existing.course_id, existing.session_id),
       academy.listStudentsForCourseSession(updated.course_id, updated.session_id),

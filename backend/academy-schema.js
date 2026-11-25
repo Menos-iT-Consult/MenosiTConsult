@@ -180,9 +180,11 @@ async function ensureAcademySchema(query) {
   await query(`CREATE TABLE IF NOT EXISTS academy_timetable (
     id text PRIMARY KEY,
     session_id text, course_id text,
-    day_of_week text, start_time text, end_time text, venue text,
+    day_of_week text, start_time text, end_time text, venue text, created_by text,
     created_at timestamptz DEFAULT now()
   );`);
+  await query(`ALTER TABLE academy_timetable
+    ADD COLUMN IF NOT EXISTS created_by text;`);
   await query(`CREATE TABLE IF NOT EXISTS academy_exams (
     id text PRIMARY KEY,
     session_id text, course_id text,
