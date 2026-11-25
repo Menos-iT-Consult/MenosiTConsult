@@ -867,6 +867,8 @@
 .academy-form-declarations { display: grid; gap: 13px; padding: 16px; border-radius: 10px; background: #f5f8fc; }
 .academy-application-form .academy-checkbox-label { display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: start; gap: 10px; color: #34445b; font-size: .8rem; font-weight: 500; line-height: 1.5; }
 .academy-application-form .academy-checkbox-label input { width: 17px; min-height: 17px; margin: 2px 0 0; padding: 0; accent-color: var(--academy-blue); }
+.academy-consent-link { margin: -9px 0 0 28px; color: var(--academy-blue-dark); font-size: .78rem; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+.academy-consent-link:focus-visible { outline: 3px solid rgba(0, 119, 182, .3); outline-offset: 3px; }
 .academy-form-navigation { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 3px; }
 .academy-form-navigation .academy-button { min-width: 130px; min-height: 47px; cursor: pointer; }
 .academy-form-navigation .academy-button:disabled { cursor: not-allowed; opacity: .65; }

@@ -792,30 +792,44 @@ export default function AcademyApplicationPage() {
                         />
                         <span>I confirm that the information in this application is accurate and complete.</span>
                       </label>
-                      <label className="academy-checkbox-label">
+                      <label className="academy-checkbox-label" htmlFor="academy-terms-accepted">
                         <input
+                          id="academy-terms-accepted"
                           name="termsAccepted"
                           type="checkbox"
                           checked={form.termsAccepted}
                           onChange={updateField}
                           required
                         />
-                        <span>
-                          I have read and agree to the MITA Academy <Link href="/academy/terms" target="_blank" rel="noopener noreferrer">Terms and Conditions</Link>.
-                        </span>
+                        <span>I have read and agree to the MITA Academy Terms and Conditions.</span>
                       </label>
-                      <label className="academy-checkbox-label">
+                      <Link
+                        className="academy-consent-link"
+                        href="/academy/terms"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Read the MITA Academy Terms and Conditions
+                      </Link>
+                      <label className="academy-checkbox-label" htmlFor="academy-privacy-accepted">
                         <input
+                          id="academy-privacy-accepted"
                           name="privacyConsent"
                           type="checkbox"
                           checked={form.privacyConsent}
                           onChange={updateField}
                           required
                         />
-                        <span>
-                          I have read the MITA Academy <Link href="/academy/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</Link> and consent to the use of my information to review and process this application.
-                        </span>
+                        <span>I consent to the use of my information as described in the MITA Academy Privacy Policy.</span>
                       </label>
+                      <Link
+                        className="academy-consent-link"
+                        href="/academy/privacy"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Read the MITA Academy Privacy Policy
+                      </Link>
                     </div>
                   </fieldset>
                 )}

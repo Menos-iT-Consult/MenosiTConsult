@@ -88,7 +88,7 @@ node server.js    # API only, on PORT (default 3000)
 | `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET` | for main-site media | Main-site Cloudflare R2 credentials and bucket |
 | `ACADEMY_R2_BUCKET` | optional | Separate Academy R2 bucket; must differ from `R2_BUCKET` and does not fall back to it |
 | `ACADEMY_R2_PUBLIC_BASE` | optional | Public base URL for Academy media in its separate bucket |
-| `ACADEMY_CERTIFICATE_R2_BUCKET` | for Academy certificates and course files | Dedicated private R2 bucket for certificate PDFs and instructor-uploaded course materials; must differ from both media buckets and must not have public access enabled |
+| `ACADEMY_CERTIFICATE_R2_BUCKET` | for Academy certificates, course files, and student photos | Dedicated private R2 bucket for certificate PDFs, instructor-uploaded course materials, and student passport photos; must differ from both media buckets and must not have public access enabled |
 | `RECIPIENT_EMAIL` | for email | Where contact-form enquiries are delivered |
 | `ADMIN_PASSWORD` | for first boot | Seeded into the `admin` table |
 | `ACADEMY_ADMIN_EMAIL` / `ACADEMY_ADMIN_PASSWORD` | before first Academy request | Credentials for the first Academy administrator, seeded only when no Academy staff accounts exist |
@@ -164,9 +164,9 @@ Main-site image uploads target `R2_BUCKET`; Academy media storage targets
 `ACADEMY_R2_BUCKET`, rejects using the same bucket name, and never falls back
 to the main bucket. The storage adapter shares the R2 account credentials, so
 the R2 token must have access to both media buckets. Academy certificate
-templates and issued PDFs use the separate `ACADEMY_CERTIFICATE_R2_BUCKET`;
-private course files also use this bucket; keep it private and grant the shared
-R2 credentials access to it.
+templates, issued PDFs, private course files, and student passport photos use
+the separate `ACADEMY_CERTIFICATE_R2_BUCKET`; keep it private and grant the
+shared R2 credentials access to it.
 Certificate templates must contain fillable text fields named `student_name`,
 `program_name`, `issue_date`, and `certificate_number`. Replacing a template
 affects future issuances only.

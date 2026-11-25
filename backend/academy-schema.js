@@ -58,6 +58,7 @@ async function ensureAcademySchema(query) {
     ON academy_login_rate_limits (updated_at);`);
   await query(`ALTER TABLE academy_students
     ADD COLUMN IF NOT EXISTS middle_name text,
+    ADD COLUMN IF NOT EXISTS photo text,
     ADD COLUMN IF NOT EXISTS gender text,
     ADD COLUMN IF NOT EXISTS nationality text,
     ADD COLUMN IF NOT EXISTS city text,
