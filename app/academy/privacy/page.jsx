@@ -125,7 +125,7 @@ export default function AcademyPrivacyPage() {
               We may update this policy as Academy services or legal
               requirements change. The current version and its update date will
               be posted on this page. For privacy requests or questions, email{' '}
-              <a href="mailto:academy@menositconsult.com">academy@menositconsult.com</a>.
+              us through the <Link href="/academy/contact">Academy contact page</Link>.
             </p>
           </section>
 

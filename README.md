@@ -79,7 +79,7 @@ node server.js    # API only, on PORT (default 3000)
 | `SESSION_SECRET` | yes | Signs the admin auth cookie |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | for main-site email | Nodemailer / Gmail SMTP credentials for contact and newsletter mail |
 | `SMTP_FROM` | optional | Visible From address for main-site email; defaults to `support@menositconsult.com` |
-| `ACADEMY_SMTP_HOST` / `ACADEMY_SMTP_PORT` / `ACADEMY_SMTP_USER` / `ACADEMY_SMTP_PASS` | for Academy email | Independent Nodemailer transport for Academy instructor invitations; does not fall back to main-site SMTP |
+| `ACADEMY_SMTP_HOST` / `ACADEMY_SMTP_PORT` / `ACADEMY_SMTP_USER` / `ACADEMY_SMTP_PASS` | for Academy email | Independent Nodemailer transport for Academy contact messages and instructor invitations; does not fall back to main-site SMTP |
 | `ACADEMY_SMTP_FROM` | optional | Visible From address for Academy email; defaults to `academy@menositconsult.com` |
 | `ACADEMY_MNOTIFY_API_KEY` | for Academy SMS | Private API key for the Academy's mNotify SMS integration |
 | `ACADEMY_MNOTIFY_SENDER` | for Academy SMS | mNotify-approved sender ID, up to 11 characters |

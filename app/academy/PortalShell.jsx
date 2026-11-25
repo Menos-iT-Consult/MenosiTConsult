@@ -47,6 +47,7 @@ const PORTALS = {
       { href: '/academy/admin/support', label: 'Student support', icon: 'support' },
       { href: '/academy/admin/reports', label: 'Reports', icon: 'reports' },
       { href: '/academy/admin/certificates', label: 'Certificates', icon: 'certificate' },
+      { href: '/academy/admin/site-settings', label: 'Site settings', icon: 'settings' },
     ],
   },
   instructor: {
@@ -133,6 +134,12 @@ function NavigationIcon({ name }) {
       <>
         <path d="M12 3 15 5l3.5.5.5 3.5 2 3-2 3-.5 3.5L15 19l-3 2-3-2-3.5-.5L5 15l-2-3 2-3 .5-3.5L9 5z" />
         <path d="m9 12 2 2 4-4M9 19l-1 3 4-2 4 2-1-3" />
+      </>
+    ),
+    settings: (
+      <>
+        <circle cx="12" cy="12" r="3" />
+        <path d="m19.4 15 .1.1 1.4 1.1-1.4 2.4-1.7-.7a8 8 0 0 1-1.8 1l-.3 1.8h-2.8l-.3-1.8a8 8 0 0 1-1.8-1l-1.7.7-1.4-2.4 1.4-1.1a7 7 0 0 1 0-2l-1.4-1.1 1.4-2.4 1.7.7a8 8 0 0 1 1.8-1l.3-1.8h2.8l.3 1.8a8 8 0 0 1 1.8 1l1.7-.7 1.4 2.4-1.4 1.1a7 7 0 0 1 0 2Z" />
       </>
     ),
     admissions: (

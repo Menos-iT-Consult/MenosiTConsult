@@ -2,6 +2,7 @@ import Link from 'next/link';
 import ProgramCards from './ProgramCards';
 import AcademyPortalLink from './AcademyPortalLink';
 import AcademyHeroMedia from './AcademyHeroMedia';
+import AcademyFooter from './AcademyFooter';
 
 export const metadata = {
   title: 'MITA IT Academy | Practical Technology Training',
@@ -211,21 +212,7 @@ export default function AcademyWelcomePage() {
         </div>
       </section>
 
-      <footer className="academy-footer">
-        <div className="academy-container academy-footer-inner">
-          <Link className="academy-brand academy-brand-footer" href="/academy">
-            <img src="/assets/academy-logo-black.png" alt="MITA IT Academy" />
-          </Link>
-          <p>Building practical skills for a connected world.</p>
-          <div>
-            <a href="https://menositconsult.com/contact">Contact us</a>
-            <Link href="/academy/terms">Terms</Link>
-            <Link href="/academy/privacy">Privacy</Link>
-            <a href="tel:+233549128384">+233 54 912 8384</a>
-          </div>
-          <small>© {new Date().getFullYear()} Menos iT Consult. All rights reserved.</small>
-        </div>
-      </footer>
+      <AcademyFooter />
     </main>
   );
 }

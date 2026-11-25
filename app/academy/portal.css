@@ -416,6 +416,9 @@
   box-shadow: 0 0 0 3px rgba(0, 119, 182, .12);
 }
 
+.ap-field { min-width: 0; margin-bottom: 16px; }
+.ap-field label { display: block; margin-bottom: 7px; color: var(--dark); font-size: .84rem; font-weight: 650; }
+
 .ap-form-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 
 .ap-error {

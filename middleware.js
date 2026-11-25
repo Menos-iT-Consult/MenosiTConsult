@@ -30,10 +30,12 @@ const ACADEMY_API_HANDLER_PREFIXES = [
 ];
 const ACADEMY_API_HANDLER_PATHS = new Set([
   '/api/academy/assignments',
+  '/api/academy/contact',
   '/api/academy/enrollments',
   '/api/academy/grades',
   '/api/academy/programs',
   '/api/academy/register',
+  '/api/academy/site-settings',
   '/api/academy/submissions',
 ]);
 
@@ -74,6 +76,10 @@ export async function middleware(request) {
   }
   if (pathname === '/instructor/login') {
     return redirect(request, '/instructor');
+  }
+  if (pathname === '/contact') {
+    if (academyHostname) return rewrite(request, '/academy/contact');
+    return NextResponse.next();
   }
 
   if (pathname.startsWith('/api/academy/')) {
@@ -123,6 +129,7 @@ export async function middleware(request) {
     pathname === '/academy/register' ||
     pathname === '/academy/terms' ||
     pathname === '/academy/privacy' ||
+    pathname === '/academy/contact' ||
     pathname === '/academy/verify' ||
     pathname.startsWith('/academy/verify/') ||
     pathname === '/academy'
@@ -169,5 +176,5 @@ function rewrite(request, path) {
 }
 
 export const config = {
-  matcher: ['/', '/admin', '/admin/:path*', '/academy/:path*', '/api/academy/:path*', '/instructor', '/instructor/:path*', '/student'],
+  matcher: ['/', '/admin', '/admin/:path*', '/academy/:path*', '/api/academy/:path*', '/contact', '/instructor', '/instructor/:path*', '/student'],
 };
