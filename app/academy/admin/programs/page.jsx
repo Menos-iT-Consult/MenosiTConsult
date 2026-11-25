@@ -460,7 +460,7 @@ export default function AcademyProgramsAdminPage() {
         ) : !error ? <div className="ap-card ap-empty"><p>No courses have been created yet.</p></div> : null}
       </section>
 
-      <section className="ap-card ap-section">
+      <section id="scholarships" className="ap-card ap-section">
         <h2>Add a scholarship program</h2>
         <p className="ap-muted">Scholarships are manually awarded by administrators. One scholarship can be assigned to each student.</p>
         <form className="ap-form-grid" onSubmit={createScholarship}>

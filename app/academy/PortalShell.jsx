@@ -41,6 +41,7 @@ const PORTALS = {
       { href: '/academy/admin/admissions', label: 'Admissions', icon: 'admissions' },
       { href: '/academy/admin/students', label: 'Students', icon: 'students' },
       { href: '/academy/admin/programs', label: 'Programs & fees', icon: 'courses' },
+      { href: '/academy/admin/programs#scholarships', label: 'Scholarships', icon: 'scholarships' },
       { href: '/academy/admin/instructors', label: 'Instructors & courses', icon: 'courses' },
       { href: '/academy/admin/timetable', label: 'Timetable', icon: 'timetable' },
       { href: '/academy/admin/announcements', label: 'Announcements', icon: 'announcements' },
@@ -277,7 +278,8 @@ export default function PortalShell({ portal, children }) {
     if (link.children) return pathname === link.href;
     const [hrefPath, hrefHash] = link.href.split('#');
     if (hrefHash) return pathname === hrefPath && activeHash === `#${hrefHash}`;
-    return pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);
+    const matchesPath = pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);
+    return matchesPath && !(pathname === hrefPath && activeHash);
   }
 
   function closeMobileMenu() {
