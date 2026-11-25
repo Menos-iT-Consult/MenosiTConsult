@@ -4,7 +4,7 @@ const academy = require('../../../../../../../backend/academy-db');
 const staffAuth = require('../../../../../../../lib/academy-staff');
 const invitations = require('../../../../../../../lib/academy-invitations');
 const { deliverInstructorInvitation } = require('../../../../../../../lib/academy-invitation-delivery');
-const { normalizeGhanaRecipient } = require('../../../../../../../lib/academy-sms');
+const { normalizeAcademyPhone } = require('../../../../../../../lib/academy-sms');
 const { noDbErrorResponse } = require('../../../../../../../lib/api-helpers');
 const { getAcademySiteUrl } = require('../../../../../../../lib/academy-site-url');
 
@@ -27,9 +27,9 @@ export async function POST(request, { params }) {
     }
     const body = await request.json().catch(() => ({}));
     const requestedPhone = body.phone == null ? staff.phone : String(body.phone).trim();
-    const phone = normalizeGhanaRecipient(requestedPhone);
+    const phone = normalizeAcademyPhone(requestedPhone);
     if (!phone) {
-      return NextResponse.json({ error: 'Provide a valid Ghana mobile number for the SMS invitation.' }, { status: 400 });
+      return NextResponse.json({ error: 'Provide a valid supported mobile number for the SMS invitation. Use +country code for international numbers.' }, { status: 400 });
     }
     if (phone !== staff.phone) {
       staff = await academy.updateStaff(id, { phone });

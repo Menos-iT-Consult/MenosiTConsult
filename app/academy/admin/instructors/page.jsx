@@ -249,17 +249,18 @@ export default function AcademyInstructorAdminPage() {
               onChange={(event) => setEmail(event.target.value)}
               required
             />
-            <label htmlFor="instructor-phone">Ghana mobile number for SMS</label>
+            <label htmlFor="instructor-phone">Mobile number for SMS</label>
             <input
               id="instructor-phone"
               className="ap-input"
               type="tel"
               autoComplete="tel"
-              placeholder="024 123 4567 or +233 24 123 4567"
+              placeholder="024 123 4567 or +1 415 555 2671"
               value={phone}
               onChange={(event) => setPhone(event.target.value)}
               required
             />
+            <small className="ap-muted">Use +country code for numbers outside Ghana.</small>
             <button className="ap-button ap-button-primary" type="submit" disabled={saving === 'create'}>
               {saving === 'create' ? 'Issuing…' : 'Create and send invitation'}
             </button>
@@ -352,18 +353,19 @@ export default function AcademyInstructorAdminPage() {
                   {member.status === 'pending' ? (
                     <div className="ap-instructor-invitation">
                       <label>
-                        Ghana mobile number for SMS
+                        Mobile number for SMS
                         <input
                           className="ap-input"
                           type="tel"
                           autoComplete="tel"
-                          placeholder="024 123 4567 or +233 24 123 4567"
+                          placeholder="024 123 4567 or +1 415 555 2671"
                           value={phoneDrafts[member.id] || ''}
                           onChange={(event) => setPhoneDrafts((current) => ({
                             ...current,
                             [member.id]: event.target.value,
                           }))}
                         />
+                        <small className="ap-muted">Use +country code for numbers outside Ghana.</small>
                       </label>
                       <button
                         className="ap-button"

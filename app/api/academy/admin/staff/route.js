@@ -4,7 +4,7 @@ const academy = require('../../../../../backend/academy-db');
 const staffAuth = require('../../../../../lib/academy-staff');
 const invitations = require('../../../../../lib/academy-invitations');
 const { deliverInstructorInvitation } = require('../../../../../lib/academy-invitation-delivery');
-const { normalizeGhanaRecipient } = require('../../../../../lib/academy-sms');
+const { normalizeAcademyPhone } = require('../../../../../lib/academy-sms');
 const { noDbErrorResponse } = require('../../../../../lib/api-helpers');
 const { getAcademySiteUrl } = require('../../../../../lib/academy-site-url');
 
@@ -46,10 +46,10 @@ export async function POST(request) {
     const name = String(body.name || '').trim();
     const email = String(body.email || '').trim().toLowerCase();
     const phone = String(body.phone || '').trim();
-    const normalizedPhone = normalizeGhanaRecipient(phone);
+    const normalizedPhone = normalizeAcademyPhone(phone);
     if (!name || name.length > 120 || !email || !EMAIL_RE.test(email) || !normalizedPhone) {
       return NextResponse.json(
-        { error: 'Provide a name, valid email address, and Ghana mobile number for the SMS invitation.' },
+        { error: 'Provide a name, valid email address, and supported mobile number for the SMS invitation. Use +country code for international numbers.' },
         { status: 400 }
       );
     }
