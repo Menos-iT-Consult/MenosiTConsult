@@ -37,6 +37,7 @@ const ACADEMY_API_HANDLER_PATHS = new Set([
   '/api/academy/register',
   '/api/academy/site-settings',
   '/api/academy/submissions',
+  '/api/academy/timetable',
 ]);
 
 export async function middleware(request) {
