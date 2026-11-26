@@ -1988,11 +1988,11 @@ async function listInstructorGradebook(staffId, courseId) {
 }
 
 async function upsertInstructorGrade(staffId, { enrollmentId, ca, exam }) {
-  const weightedTotal = '((COALESCE($3, 0) * 0.3) + (COALESCE($4, 0) * 0.7))';
+  const weightedTotal = '((COALESCE($3::numeric, 0) * 0.3) + (COALESCE($4::numeric, 0) * 0.7))';
   const { rows } = await q(
     `INSERT INTO academy_grades
       (enrollment_id, ca, exam, total, letter, points, updated_by, updated_at)
-     SELECT e.id, $3, $4, ${weightedTotal},
+     SELECT e.id, $3::numeric, $4::numeric, ${weightedTotal},
             CASE
               WHEN ${weightedTotal} >= 80 THEN 'A'
               WHEN ${weightedTotal} >= 70 THEN 'B'
