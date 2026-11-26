@@ -1,6 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import {
+  cancelPrivateAcademyCourseFile,
+  uploadPrivateAcademyCourseFile,
+} from '../../../lib/academy-upload-client';
 
 async function readResult(response, fallback) {
   const result = await response.json();
@@ -27,25 +31,34 @@ export default function InstructorLessonMaterials({ courseId, lesson, onChanged 
     setSaving('add');
     setError('');
     try {
-      const body = kind === 'link'
-        ? JSON.stringify({ courseId, title, url })
-        : (() => {
-            const form = new FormData();
-            form.set('courseId', courseId);
-            form.set('title', title);
-            form.set('file', file);
-            return form;
-          })();
-      const response = await fetch(
-        `/api/academy/instructor/lessons/${encodeURIComponent(lesson.id)}/materials`,
-        {
-          method: 'POST',
-          headers: kind === 'link' ? { 'Content-Type': 'application/json' } : undefined,
-          credentials: 'include',
-          body,
+      const uploadKey = kind === 'file'
+        ? await uploadPrivateAcademyCourseFile(file, courseId)
+        : '';
+      const body = JSON.stringify(kind === 'link'
+        ? { courseId, title, url }
+        : { courseId, title, fileName: file.name, uploadKey });
+      let created;
+      try {
+        const response = await fetch(
+          `/api/academy/instructor/lessons/${encodeURIComponent(lesson.id)}/materials`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body,
+          }
+        );
+        created = await readResult(response, 'Could not add course material.');
+      } catch (saveError) {
+        if (uploadKey) {
+          try {
+            await cancelPrivateAcademyCourseFile(courseId, uploadKey);
+          } catch (cleanupError) {
+            console.error('Academy staged lesson-file cleanup error:', cleanupError);
+          }
         }
-      );
-      const created = await readResult(response, 'Could not add course material.');
+        throw saveError;
+      }
       setTitle('');
       setUrl('');
       setFile(null);
@@ -128,12 +141,12 @@ export default function InstructorLessonMaterials({ courseId, lesson, onChanged 
             />
           </label>
         ) : (
-          <label>File (PDF, TXT, DOCX, PPTX, XLSX; max 4 MB)
+          <label>File (PDF, TXT, DOCX, PPTX, XLSX, JPEG, PNG, WebP; max 10 MB)
             <input
               id={`lesson-file-${lesson.id}`}
               className="ap-input"
               type="file"
-              accept=".pdf,.txt,.docx,.pptx,.xlsx"
+              accept=".pdf,.txt,.docx,.pptx,.xlsx,.jpg,.jpeg,.png,.webp"
               onChange={(event) => setFile(event.target.files?.[0] || null)}
               required
             />

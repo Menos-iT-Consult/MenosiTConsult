@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 const academy = require('../../../../../backend/academy-db');
+const storage = require('../../../../../backend/academy-r2');
 const staffAuth = require('../../../../../lib/academy-staff');
 const {
   sendStudentNotifications,
@@ -82,11 +83,29 @@ export async function PUT(request) {
     if (!(await academy.listSessions()).some((session) => session.id === quiz.sessionId)) {
       return NextResponse.json({ error: 'The selected session was not found.' }, { status: 400 });
     }
+    const previousAttachmentKeys = await academy.listInstructorQuizAttachmentKeys(
+      gate.staff.id,
+      body.quizId
+    );
     const updated = await academy.updateInstructorQuiz(gate.staff.id, body.quizId, quiz);
     if (!updated) {
       return NextResponse.json({
         error: 'Only unpublished quizzes with no student attempts can be edited.',
       }, { status: 409 });
+    }
+    const retainedAttachmentKeys = new Set(await academy.listInstructorQuizAttachmentKeys(
+      gate.staff.id,
+      body.quizId
+    ));
+    for (const key of previousAttachmentKeys) {
+      if (retainedAttachmentKeys.has(key)) continue;
+      try {
+        if (storage.isPrivateCourseMaterialKey(key)) {
+          await storage.deletePrivateCourseMaterial(key);
+        }
+      } catch (cleanupError) {
+        console.error('Academy quiz attachment cleanup error:', cleanupError);
+      }
     }
     return NextResponse.json(updated);
   } catch (error) {

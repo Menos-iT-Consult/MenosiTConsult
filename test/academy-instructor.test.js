@@ -184,6 +184,7 @@ test('Academy R2 requires its own bucket and rejects the main-site bucket', asyn
   const names = [
     'R2_ACCESS_KEY_ID',
     'R2_SECRET_ACCESS_KEY',
+    'R2_ACCOUNT_ID',
     'R2_BUCKET',
     'ACADEMY_R2_BUCKET',
     'ACADEMY_R2_PUBLIC_BASE',
@@ -194,6 +195,7 @@ test('Academy R2 requires its own bucket and rejects the main-site bucket', asyn
   try {
     process.env.R2_ACCESS_KEY_ID = 'test-access';
     process.env.R2_SECRET_ACCESS_KEY = 'test-secret';
+    process.env.R2_ACCOUNT_ID = '00000000000000000000000000000000';
     process.env.R2_BUCKET = 'main-media';
     process.env.ACADEMY_R2_BUCKET = 'academy-media';
     process.env.ACADEMY_CERTIFICATE_R2_BUCKET = 'academy-private-certificates';
@@ -264,8 +266,28 @@ test('Academy R2 requires its own bucket and rejects the main-site bucket', asyn
       true
     );
     assert.equal(
+      academyR2.isPrivateCourseMaterialUploadKey('academy/private/course-content-staging/2026/0123456789abcdef0123456789abcdef01234567.png'),
+      true
+    );
+    assert.equal(
+      academyR2.isPrivateCourseMaterialUploadKey('academy/private/course-content/2026/0123456789abcdef0123456789abcdef01234567.png'),
+      false
+    );
+    assert.equal(
       academyR2.isPrivateCourseMaterialKey('academy/private/course-content/2026/../../student.pdf'),
       false
+    );
+    const signedCourseUpload = await academyR2.presignPrivateCourseMaterialUpload('image/png', 1234);
+    const signedHeaders = new URL(signedCourseUpload.uploadUrl).searchParams.get('X-Amz-SignedHeaders');
+    assert.match(signedHeaders, /content-length/);
+    assert.equal(academyR2.isPrivateCourseMaterialUploadKey(signedCourseUpload.key), true);
+    await assert.rejects(
+      academyR2.presignPrivateCourseMaterialUpload('image/gif', 100),
+      /Unsupported private Academy course material type/
+    );
+    await assert.rejects(
+      academyR2.presignPrivateCourseMaterialUpload('image/png', 10 * 1024 * 1024 + 1),
+      /between 1 byte and 10 MB/
     );
     await assert.rejects(
       academyR2.getPrivateCourseMaterial('academy/media/2026/student.pdf'),

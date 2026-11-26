@@ -127,6 +127,15 @@ export default function AssignmentsPage() {
                       Open assignment resource
                     </a>
                   )}
+                  {assignment.file_attachments?.length > 0 && (
+                    <ul className="ap-lesson-material-list">
+                      {assignment.file_attachments.map((attachment) => (
+                        <li key={attachment.id}>
+                          <a href={attachment.downloadUrl}>{attachment.fileName}</a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   {submitted && (
                     <div className="ap-submission-history">
                       <p className="ap-muted">

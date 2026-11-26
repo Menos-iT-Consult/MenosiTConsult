@@ -133,6 +133,8 @@ async function ensureAcademySchema(query) {
     created_by text,
     created_at timestamptz DEFAULT now()
   );`);
+  await query(`ALTER TABLE academy_assignments
+    ADD COLUMN IF NOT EXISTS file_attachments jsonb NOT NULL DEFAULT '[]'::jsonb;`);
   await query(`CREATE TABLE IF NOT EXISTS academy_submissions (
     id text PRIMARY KEY,
     assignment_id text, student_id text,
@@ -159,6 +161,8 @@ async function ensureAcademySchema(query) {
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
   );`);
+  await query(`ALTER TABLE academy_quizzes
+    ADD COLUMN IF NOT EXISTS attachments jsonb NOT NULL DEFAULT '[]'::jsonb;`);
   await query(`CREATE INDEX IF NOT EXISTS academy_quizzes_course_session
     ON academy_quizzes (course_id, session_id, published);`);
   await query(`CREATE TABLE IF NOT EXISTS academy_quiz_attempts (

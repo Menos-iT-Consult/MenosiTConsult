@@ -5,6 +5,10 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import InstructorQuizManager from '../InstructorQuizManager';
 import InstructorLessonMaterials from '../InstructorLessonMaterials';
+import {
+  cancelPrivateAcademyCourseFile,
+  uploadPrivateAcademyCourseFile,
+} from '../../../../lib/academy-upload-client';
 
 const TABS = ['Overview', 'Assignments', 'Quizzes', 'Gradebook', 'Attendance', 'Lessons & content'];
 const TOOL_TABS = {
@@ -56,6 +60,8 @@ export default function InstructorCoursePage() {
   const [assignmentForm, setAssignmentForm] = useState({
     title: '', instructions: '', dueAt: '', maxScore: '100',
   });
+  const [assignmentFiles, setAssignmentFiles] = useState([]);
+  const [assignmentUploadFiles, setAssignmentUploadFiles] = useState({});
   const [gradeForms, setGradeForms] = useState({});
   const [submissionForms, setSubmissionForms] = useState({});
   const [loading, setLoading] = useState(true);
@@ -167,6 +173,7 @@ export default function InstructorCoursePage() {
     setError('');
     setNotice('');
     try {
+      const selectedFiles = assignmentFiles;
       const response = await fetch('/api/academy/instructor/assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -179,12 +186,82 @@ export default function InstructorCoursePage() {
           dueAt: assignmentForm.dueAt ? new Date(assignmentForm.dueAt).toISOString() : null,
         }),
       });
-      await readResult(response, 'Could not create assignment.');
+      const created = await readResult(response, 'Could not create assignment.');
       setAssignmentForm({ title: '', instructions: '', dueAt: '', maxScore: '100' });
-      setNotice('Assignment created.');
+      setAssignmentFiles([]);
+      const createFileInput = document.getElementById('assignment-files');
+      if (createFileInput) createFileInput.value = '';
+      let uploadError = '';
+      try {
+        await uploadAssignmentFiles(created.id, selectedFiles, (completed) => {
+          setAssignmentUploadFiles((current) => ({
+            ...current,
+            [created.id]: selectedFiles.slice(completed),
+          }));
+        });
+      } catch (fileError) {
+        uploadError = fileError.message || 'Could not upload assignment files.';
+      }
       await loadWorkspace();
+      if (uploadError) {
+        setError(`Assignment created, but some files could not be uploaded: ${uploadError} Add them from the assignment card.`);
+      } else {
+        setNotice(selectedFiles.length ? 'Assignment and files created.' : 'Assignment created.');
+      }
     } catch (saveError) {
       setError(saveError.message || 'Could not create assignment.');
+    } finally {
+      setSaving('');
+    }
+  }
+
+  async function uploadAssignmentFiles(assignmentId, files, onProgress = () => {}) {
+    for (let index = 0; index < files.length; index += 1) {
+      const file = files[index];
+      const uploadKey = await uploadPrivateAcademyCourseFile(file, courseId);
+      try {
+        const response = await fetch(
+          `/api/academy/instructor/assignments/${encodeURIComponent(assignmentId)}/attachments`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ uploadKey, fileName: file.name }),
+          }
+        );
+        await readResult(response, 'Could not upload assignment file.');
+      } catch (uploadError) {
+        try {
+          await cancelPrivateAcademyCourseFile(courseId, uploadKey);
+        } catch (cleanupError) {
+          console.error('Academy staged assignment-file cleanup error:', cleanupError);
+        }
+        throw uploadError;
+      }
+      onProgress(index + 1);
+    }
+  }
+
+  async function addAssignmentFiles(assignment) {
+    const files = assignmentUploadFiles[assignment.id] || [];
+    if (!files.length) return;
+    setSaving(`attachments-${assignment.id}`);
+    setError('');
+    setNotice('');
+    try {
+      await uploadAssignmentFiles(assignment.id, files, (completed) => {
+        setAssignmentUploadFiles((current) => ({
+          ...current,
+          [assignment.id]: files.slice(completed),
+        }));
+      });
+      setAssignmentUploadFiles((current) => ({ ...current, [assignment.id]: [] }));
+      const fileInput = document.getElementById(`assignment-files-${assignment.id}`);
+      if (fileInput) fileInput.value = '';
+      await loadWorkspace();
+      setNotice('Assignment files uploaded.');
+    } catch (uploadError) {
+      setError(uploadError.message || 'Could not upload assignment files. Any previously completed uploads were saved.');
     } finally {
       setSaving('');
     }
@@ -420,6 +497,16 @@ export default function InstructorCoursePage() {
                 <label className="ap-form-wide">Instructions
                   <textarea className="ap-input ap-textarea" rows={4} maxLength={10000} value={assignmentForm.instructions} onChange={(event) => setAssignmentForm({ ...assignmentForm, instructions: event.target.value })} />
                 </label>
+                <label className="ap-form-wide">Attachments (PDF, TXT, DOCX, PPTX, XLSX, JPEG, PNG, WebP; up to 10 MB each)
+                  <input
+                    id="assignment-files"
+                    className="ap-input"
+                    type="file"
+                    multiple
+                    accept=".pdf,.txt,.docx,.pptx,.xlsx,.jpg,.jpeg,.png,.webp"
+                    onChange={(event) => setAssignmentFiles(Array.from(event.target.files || []))}
+                  />
+                </label>
                 <button className="ap-button ap-button-primary" type="submit" disabled={saving === 'assignment' || !sessionId}>
                   {saving === 'assignment' ? 'Creating…' : 'Create assignment'}
                 </button>
@@ -440,6 +527,36 @@ export default function InstructorCoursePage() {
                   </div>
                 </div>
                 {assignment.instructions && <p>{assignment.instructions}</p>}
+                {assignment.attachments?.length > 0 && (
+                  <ul className="ap-lesson-material-list">
+                    {assignment.attachments.map((attachment) => (
+                      <li key={attachment.id}>
+                        <a href={attachment.downloadUrl}>{attachment.fileName}</a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <label>Upload more files (up to 10 MB each)
+                  <input
+                    id={`assignment-files-${assignment.id}`}
+                    className="ap-input"
+                    type="file"
+                    multiple
+                    accept=".pdf,.txt,.docx,.pptx,.xlsx,.jpg,.jpeg,.png,.webp"
+                    onChange={(event) => setAssignmentUploadFiles((current) => ({
+                      ...current,
+                      [assignment.id]: Array.from(event.target.files || []),
+                    }))}
+                  />
+                </label>
+                <button
+                  className="ap-button"
+                  type="button"
+                  onClick={() => addAssignmentFiles(assignment)}
+                  disabled={!assignmentUploadFiles[assignment.id]?.length || saving === `attachments-${assignment.id}`}
+                >
+                  {saving === `attachments-${assignment.id}` ? 'Uploading…' : 'Upload files'}
+                </button>
                 {submissions.filter((submission) => submission.assignmentId === assignment.id).length ? (
                   <div className="ap-stack">
                     {submissions.filter((submission) => submission.assignmentId === assignment.id).map((submission) => (

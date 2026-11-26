@@ -187,6 +187,15 @@ export default function QuizCenter({ courseId }) {
                   </div>
                   <span className="ap-chip ap-chip-neutral">{availability}</span>
                 </div>
+                {quiz.attachments?.length > 0 && (
+                  <ul className="ap-lesson-material-list">
+                    {quiz.attachments.map((attachment) => (
+                      <li key={attachment.id}>
+                        <a href={attachment.downloadUrl}>{attachment.fileName}</a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 {isActive ? (
                   <div className="ap-quiz-taking">
                     <div className="ap-quiz-timer" role="timer">
@@ -195,6 +204,15 @@ export default function QuizCenter({ courseId }) {
                     {questions.map((question, index) => (
                       <fieldset className="ap-quiz-question" key={question.id}>
                         <legend>{index + 1}. {question.prompt}</legend>
+                        {question.attachments?.length > 0 && (
+                          <ul className="ap-lesson-material-list">
+                            {question.attachments.map((attachment) => (
+                              <li key={attachment.id}>
+                                <a href={attachment.downloadUrl}>{attachment.fileName}</a>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                         {question.options.map((option) => (
                           <label className="ap-quiz-option" key={option.id}>
                             <input

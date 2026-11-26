@@ -1,11 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import {
+  cancelPrivateAcademyCourseFile,
+  uploadPrivateAcademyCourseFile,
+} from '../../../lib/academy-upload-client';
 
 const EMPTY_QUESTION = () => ({
   prompt: '',
   options: ['', '', '', ''],
   correctIndex: 0,
+  sourceQuestionId: '',
+  existingAttachments: [],
+  files: [],
 });
 
 function localDateTimeValue(value) {
@@ -31,6 +38,8 @@ export default function InstructorQuizManager({ courseId, sessions }) {
     opensAt: '',
     closesAt: '',
     published: false,
+    attachments: [],
+    existingAttachments: [],
     questions: [EMPTY_QUESTION()],
   });
   const [loading, setLoading] = useState(true);
@@ -71,32 +80,124 @@ export default function InstructorQuizManager({ courseId, sessions }) {
     });
   }
 
+  async function uploadQuizFile(quizId, file, questionId = '') {
+    const uploadKey = await uploadPrivateAcademyCourseFile(file, courseId);
+    try {
+      const response = await fetch(
+        `/api/academy/instructor/quizzes/${encodeURIComponent(quizId)}/attachments`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ courseId, uploadKey, fileName: file.name, questionId }),
+        }
+      );
+      return await readResult(response, 'Could not upload quiz file.');
+    } catch (uploadError) {
+      try {
+        await cancelPrivateAcademyCourseFile(courseId, uploadKey);
+      } catch (cleanupError) {
+        console.error('Academy staged quiz-file cleanup error:', cleanupError);
+      }
+      throw uploadError;
+    }
+  }
+
   async function createQuiz(event) {
     event.preventDefault();
     setSaving('create');
     setError('');
     setNotice('');
+    let savedQuiz = false;
+    let publishAttempted = false;
     try {
+      const isEditing = Boolean(editingQuizId);
+      const shouldPublish = !isEditing && form.published;
+      const uploadTasks = [
+        ...form.attachments.map((file) => ({ file, questionIndex: -1 })),
+        ...form.questions.flatMap((question, questionIndex) =>
+          question.files.map((file) => ({ file, questionIndex }))
+        ),
+      ];
       const response = await fetch('/api/academy/instructor/quizzes', {
         method: editingQuizId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          ...form,
-          quizId: editingQuizId || undefined,
-          courseId,
+          sessionId: form.sessionId,
+          title: form.title,
+          description: form.description,
           durationMinutes: Number(form.durationMinutes),
           maxAttempts: Number(form.maxAttempts),
           opensAt: form.opensAt ? new Date(form.opensAt).toISOString() : null,
           closesAt: form.closesAt ? new Date(form.closesAt).toISOString() : null,
+          published: shouldPublish && uploadTasks.length === 0,
+          questions: form.questions.map((question) => ({
+            prompt: question.prompt,
+            options: question.options,
+            correctIndex: question.correctIndex,
+            sourceQuestionId: question.sourceQuestionId || '',
+          })),
+          quizId: editingQuizId || undefined,
+          courseId,
         }),
       });
       const created = await readResult(response, 'Could not create quiz.');
-      setNotice(editingQuizId
-        ? 'Quiz updated. Publish it when it is ready.'
-        : created.published
-          ? 'Quiz created and published. Enrolled students have been notified.'
-          : 'Quiz saved as a draft.');
+      savedQuiz = true;
+      setEditingQuizId(created.id);
+      setForm((current) => ({
+        ...current,
+        published: false,
+        questions: current.questions.map((question, index) => ({
+          ...question,
+          sourceQuestionId: created.questions[index]?.id || question.sourceQuestionId,
+          existingAttachments: created.questions[index]?.attachments || question.existingAttachments,
+        })),
+        existingAttachments: created.attachments || current.existingAttachments,
+      }));
+
+      for (let index = 0; index < uploadTasks.length; index += 1) {
+        const task = uploadTasks[index];
+        const questionId = task.questionIndex < 0
+          ? ''
+          : created.questions[task.questionIndex]?.id;
+        const uploaded = await uploadQuizFile(created.id, task.file, questionId);
+        setForm((current) => ({
+          ...current,
+          attachments: task.questionIndex < 0
+            ? current.attachments.filter((file) => file !== task.file)
+            : current.attachments,
+          existingAttachments: task.questionIndex < 0
+            ? [...current.existingAttachments, uploaded]
+            : current.existingAttachments,
+          questions: current.questions.map((question, questionIndex) => {
+            if (questionIndex !== task.questionIndex) return question;
+            return {
+              ...question,
+              files: question.files.filter((file) => file !== task.file),
+              existingAttachments: [...question.existingAttachments, uploaded],
+            };
+          }),
+        }));
+      }
+
+      if (shouldPublish && uploadTasks.length) {
+        publishAttempted = true;
+        const publishResponse = await fetch('/api/academy/instructor/quizzes', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ quizId: created.id, published: true }),
+        });
+        await readResult(publishResponse, 'Quiz files were uploaded, but the quiz could not be published.');
+        setNotice('Quiz and files published. Enrolled students have been notified.');
+      } else {
+        setNotice(isEditing
+          ? 'Quiz updated. Publish it when it is ready.'
+          : created.published
+            ? 'Quiz created and published. Enrolled students have been notified.'
+            : 'Quiz saved as a draft.');
+      }
       setEditingQuizId('');
       setForm((current) => ({
         ...current,
@@ -104,11 +205,21 @@ export default function InstructorQuizManager({ courseId, sessions }) {
         description: '',
         opensAt: '',
         closesAt: '',
+        attachments: [],
+        existingAttachments: [],
         questions: [EMPTY_QUESTION()],
       }));
       await loadQuizzes();
     } catch (saveError) {
-      setError(saveError.message || 'Could not create quiz.');
+      if (savedQuiz) {
+        const message = publishAttempted
+          ? `Quiz and files were saved, but publication could not be confirmed: ${saveError.message || 'Could not publish the quiz.'}`
+          : `Quiz saved as a draft, but the remaining file operation failed: ${saveError.message || 'Could not upload quiz files.'}`;
+        setError(message);
+        await loadQuizzes();
+      } else {
+        setError(saveError.message || 'Could not create quiz.');
+      }
     } finally {
       setSaving('');
     }
@@ -127,10 +238,15 @@ export default function InstructorQuizManager({ courseId, sessions }) {
       opensAt: localDateTimeValue(quiz.opensAt),
       closesAt: localDateTimeValue(quiz.closesAt),
       published: false,
+      attachments: [],
+      existingAttachments: quiz.attachments || [],
       questions: quiz.questions.map((question) => ({
         prompt: question.prompt,
         options: question.options.map((option) => option.text),
         correctIndex: question.options.findIndex((option) => option.id === question.correctOptionId),
+        sourceQuestionId: question.id,
+        existingAttachments: question.attachments || [],
+        files: [],
       })),
     });
     document.querySelector('.ap-quiz-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -189,6 +305,25 @@ export default function InstructorQuizManager({ courseId, sessions }) {
           <label className="ap-form-wide">Instructions
             <textarea className="ap-input ap-textarea" rows={2} maxLength={3000} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
           </label>
+          <label className="ap-form-wide">Quiz-wide files (PDF, TXT, DOCX, PPTX, XLSX, JPEG, PNG, WebP; up to 10 MB each)
+            <input
+              className="ap-input"
+              type="file"
+              multiple
+              accept=".pdf,.txt,.docx,.pptx,.xlsx,.jpg,.jpeg,.png,.webp"
+              onChange={(event) => setForm({
+                ...form,
+                attachments: Array.from(event.target.files || []),
+              })}
+            />
+          </label>
+          {form.existingAttachments.length > 0 && (
+            <ul className="ap-lesson-material-list ap-form-wide">
+              {form.existingAttachments.map((attachment) => (
+                <li key={attachment.id}><a href={attachment.downloadUrl}>{attachment.fileName}</a></li>
+              ))}
+            </ul>
+          )}
           <div className="ap-form-wide ap-quiz-editor">
             {form.questions.map((question, questionIndex) => (
               <fieldset className="ap-quiz-question-editor" key={questionIndex}>
@@ -196,6 +331,24 @@ export default function InstructorQuizManager({ courseId, sessions }) {
                 <label>Question text
                   <textarea className="ap-input ap-textarea" rows={2} maxLength={1000} value={question.prompt} onChange={(event) => updateQuestion(questionIndex, { prompt: event.target.value })} required />
                 </label>
+                <label>Question files (up to 10 MB each)
+                  <input
+                    className="ap-input"
+                    type="file"
+                    multiple
+                    accept=".pdf,.txt,.docx,.pptx,.xlsx,.jpg,.jpeg,.png,.webp"
+                    onChange={(event) => updateQuestion(questionIndex, {
+                      files: Array.from(event.target.files || []),
+                    })}
+                  />
+                </label>
+                {question.existingAttachments.length > 0 && (
+                  <ul className="ap-lesson-material-list">
+                    {question.existingAttachments.map((attachment) => (
+                      <li key={attachment.id}><a href={attachment.downloadUrl}>{attachment.fileName}</a></li>
+                    ))}
+                  </ul>
+                )}
                 {question.options.map((option, optionIndex) => (
                   <label className="ap-quiz-editor-option" key={optionIndex}>
                     <span>Option {optionIndex + 1}</span>
@@ -246,7 +399,17 @@ export default function InstructorQuizManager({ courseId, sessions }) {
               type="button"
               onClick={() => {
                 setEditingQuizId('');
-                setForm((current) => ({ ...current, title: '', description: '', opensAt: '', closesAt: '', questions: [EMPTY_QUESTION()] }));
+                setForm((current) => ({
+                  ...current,
+                  title: '',
+                  description: '',
+                  opensAt: '',
+                  closesAt: '',
+                  published: false,
+                  attachments: [],
+                  existingAttachments: [],
+                  questions: [EMPTY_QUESTION()],
+                }));
               }}
             >
               Cancel editing
@@ -288,6 +451,24 @@ export default function InstructorQuizManager({ courseId, sessions }) {
                 </div>
               </div>
               <p>{quiz.questions.length} questions · {quiz.attempts.length} attempt{quiz.attempts.length === 1 ? '' : 's'} started</p>
+              {quiz.attachments?.length > 0 && (
+                <ul className="ap-lesson-material-list">
+                  {quiz.attachments.map((attachment) => (
+                    <li key={attachment.id}><a href={attachment.downloadUrl}>{attachment.fileName}</a></li>
+                  ))}
+                </ul>
+              )}
+              {quiz.questions.some((question) => question.attachments?.length > 0) && (
+                <ul className="ap-lesson-material-list">
+                  {quiz.questions.flatMap((question, questionIndex) =>
+                    question.attachments.map((attachment) => (
+                      <li key={attachment.id}>
+                        Question {questionIndex + 1}: <a href={attachment.downloadUrl}>{attachment.fileName}</a>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              )}
               {quiz.attempts.length ? (
                 <div className="ap-table-wrap">
                   <table className="ap-table">

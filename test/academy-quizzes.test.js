@@ -56,5 +56,31 @@ test('quiz scoring accepts only valid question and option IDs', () => {
     id: 'q1',
     prompt: 'One plus one?',
     options: [{ id: 'o1', text: 'One' }, { id: 'o2', text: 'Two' }],
+    attachments: [],
+  });
+});
+
+test('public quiz questions expose safe attachment metadata without storage keys or answers', () => {
+  const question = {
+    ...normalizeQuizInput(quizInput()).questions[0],
+    attachments: [{
+      id: 'file-1',
+      fileName: 'diagram.png',
+      fileSize: 123,
+      contentType: 'image/png',
+      storageKey: 'private-key',
+    }],
+  };
+  assert.deepEqual(publicQuizQuestion(question, 'quiz-1'), {
+    id: 'q1',
+    prompt: 'One plus one?',
+    options: [{ id: 'o1', text: 'One' }, { id: 'o2', text: 'Two' }],
+    attachments: [{
+      id: 'file-1',
+      fileName: 'diagram.png',
+      fileSize: 123,
+      contentType: 'image/png',
+      downloadUrl: '/api/academy/quizzes/quiz-1/attachments/file-1',
+    }],
   });
 });

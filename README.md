@@ -167,6 +167,14 @@ the R2 token must have access to both media buckets. Academy certificate
 templates, issued PDFs, private course files, and student passport photos use
 the separate `ACADEMY_CERTIFICATE_R2_BUCKET`; keep it private and grant the
 shared R2 credentials access to it.
+Instructor file uploads use a 10-minute presigned PUT directly to this private
+bucket so 10 MB files do not pass through Vercel's request-body limit. Configure
+bucket CORS to allow `PUT` from the Academy site's origin (and
+`http://localhost:3000` for local testing) with the `Content-Type` header. The
+server verifies each staged file's size, declared type, extension, and signature
+before moving it into permanent private storage. Add a lifecycle rule to expire
+objects under `academy/private/course-content-staging/` so abandoned uploads
+are removed.
 Certificate templates must contain fillable text fields named `student_name`,
 `program_name`, `issue_date`, and `certificate_number`. Replacing a template
 affects future issuances only.

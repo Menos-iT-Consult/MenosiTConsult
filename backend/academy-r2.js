@@ -289,11 +289,82 @@ const PRIVATE_COURSE_MATERIAL_TYPES = {
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
 };
+const MAX_PRIVATE_COURSE_MATERIAL_SIZE = 10 * 1024 * 1024;
 
 function isPrivateCourseMaterialKey(key) {
   return typeof key === 'string' &&
-    /^academy\/private\/course-content\/\d{4}\/[a-f0-9]{40}\.(pdf|txt|docx|pptx|xlsx)$/.test(key);
+    /^academy\/private\/course-content\/\d{4}\/[a-f0-9]{40}\.(pdf|txt|docx|pptx|xlsx|jpg|png|webp)$/.test(key);
+}
+
+function isPrivateCourseMaterialUploadKey(key) {
+  return typeof key === 'string' &&
+    /^academy\/private\/course-content-staging\/\d{4}\/[a-f0-9]{40}\.(pdf|txt|docx|pptx|xlsx|jpg|png|webp)$/.test(key);
+}
+
+async function presignPrivateCourseMaterialUpload(mime, size) {
+  const extension = PRIVATE_COURSE_MATERIAL_TYPES[mime];
+  if (!extension) {
+    const error = new Error('Unsupported private Academy course material type.');
+    error.invalidCourseMaterial = true;
+    throw error;
+  }
+  if (!Number.isSafeInteger(size) || size < 1 || size > MAX_PRIVATE_COURSE_MATERIAL_SIZE) {
+    const error = new Error('Course files must be between 1 byte and 10 MB.');
+    error.invalidCourseMaterial = true;
+    throw error;
+  }
+  const { PutObjectCommand } = require('@aws-sdk/client-s3');
+  const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+  const key = `academy/private/course-content-staging/${new Date().getFullYear()}/${crypto.randomBytes(20).toString('hex')}.${extension}`;
+  const command = new PutObjectCommand({
+    Bucket: certificateBucket(),
+    Key: key,
+    Body: undefined,
+    ContentLength: size,
+    ContentType: mime,
+    CacheControl: 'private, no-store',
+  });
+  const uploadUrl = await getSignedUrl(getCertificateClient(), command, { expiresIn: 600 });
+  return { key, uploadUrl, mime };
+}
+
+async function getPrivateCourseMaterialUploadInfo(key) {
+  if (!isPrivateCourseMaterialUploadKey(key)) {
+    throw new Error('Invalid private Academy course material upload key.');
+  }
+  const { HeadObjectCommand } = require('@aws-sdk/client-s3');
+  const result = await getCertificateClient().send(new HeadObjectCommand({
+    Bucket: certificateBucket(),
+    Key: key,
+  }));
+  return { size: result.ContentLength, mime: result.ContentType };
+}
+
+async function getPrivateCourseMaterialUpload(key) {
+  if (!isPrivateCourseMaterialUploadKey(key)) {
+    throw new Error('Invalid private Academy course material upload key.');
+  }
+  const { GetObjectCommand } = require('@aws-sdk/client-s3');
+  const result = await getCertificateClient().send(new GetObjectCommand({
+    Bucket: certificateBucket(),
+    Key: key,
+  }));
+  return Buffer.from(await result.transformToByteArray());
+}
+
+async function deletePrivateCourseMaterialUpload(key) {
+  if (!isPrivateCourseMaterialUploadKey(key)) {
+    throw new Error('Invalid private Academy course material upload key.');
+  }
+  const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
+  await getCertificateClient().send(new DeleteObjectCommand({
+    Bucket: certificateBucket(),
+    Key: key,
+  }));
 }
 
 async function putPrivateCourseMaterial(buffer, mime) {
@@ -413,6 +484,11 @@ module.exports = {
   getPrivatePhoto,
   deletePrivatePhoto,
   isPrivateCourseMaterialKey,
+  isPrivateCourseMaterialUploadKey,
+  presignPrivateCourseMaterialUpload,
+  getPrivateCourseMaterialUploadInfo,
+  getPrivateCourseMaterialUpload,
+  deletePrivateCourseMaterialUpload,
   putPrivateCourseMaterial,
   getPrivateCourseMaterial,
   deletePrivateCourseMaterial,

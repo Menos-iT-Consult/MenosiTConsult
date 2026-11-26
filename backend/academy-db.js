@@ -1396,7 +1396,8 @@ async function getStudentPortalData(studentId) {
       ),
       q(
         `SELECT a.id, a.course_id, a.session_id, a.title, a.instructions, a.due_at,
-                a.max_score, a.attachment, c.title AS course_title, s.name AS session_name,
+                a.max_score, a.attachment, a.file_attachments,
+                c.title AS course_title, s.name AS session_name,
                 sub.id AS submission_id, sub.submitted_at, sub.score, sub.feedback,
                 sub.text AS submission_text, sub.file AS submission_file
            FROM academy_assignments a
@@ -1466,7 +1467,13 @@ async function getStudentPortalData(studentId) {
 
   return {
     enrollments: enrollmentsResult.rows,
-    assignments: assignmentsResult.rows,
+    assignments: assignmentsResult.rows.map((row) => ({
+      ...row,
+      file_attachments: mapCourseFileAttachments(
+        row.file_attachments,
+        (attachmentId) => assignmentAttachmentUrl(row.id, attachmentId)
+      ),
+    })),
     exams: examsResult.rows,
     timetable: timetableResult.rows,
     invoices: invoicesResult.rows,
@@ -1594,6 +1601,17 @@ async function listInstructorAssignments(staffId, courseId) {
   return rows.map(mapAssignment);
 }
 
+async function getInstructorAssignment(staffId, assignmentId) {
+  const { rows } = await q(
+    `SELECT a.*
+       FROM academy_assignments a
+       JOIN academy_courses c ON c.id = a.course_id
+      WHERE a.id = $1 AND c.instructor_staff_id = $2`,
+    [assignmentId, staffId]
+  );
+  return rows[0] ? mapAssignment(rows[0]) : null;
+}
+
 async function listStudentAssignments(studentId) {
   const { rows } = await q(
     `SELECT a.*
@@ -1623,6 +1641,42 @@ async function createInstructorAssignment(staffId, assignment) {
     ]
   );
   return rows[0] ? mapAssignment(rows[0]) : null;
+}
+
+async function addInstructorAssignmentAttachment(staffId, assignmentId, attachment) {
+  const { rows } = await q(
+    `UPDATE academy_assignments a
+        SET file_attachments = COALESCE(a.file_attachments, '[]'::jsonb) || $3::jsonb
+       FROM academy_courses c
+      WHERE a.id = $1 AND c.id = a.course_id AND c.instructor_staff_id = $2
+     RETURNING a.*`,
+    [assignmentId, staffId, JSON.stringify([attachment])]
+  );
+  return rows[0] ? mapAssignment(rows[0]) : null;
+}
+
+async function getInstructorAssignmentAttachment(staffId, assignmentId, attachmentId) {
+  const { rows } = await q(
+    `SELECT a.file_attachments
+       FROM academy_assignments a
+       JOIN academy_courses c ON c.id = a.course_id
+      WHERE a.id = $1 AND c.instructor_staff_id = $2`,
+    [assignmentId, staffId]
+  );
+  return findStoredCourseFileAttachment(rows[0]?.file_attachments, attachmentId);
+}
+
+async function getStudentAssignmentAttachment(studentId, assignmentId, attachmentId) {
+  const { rows } = await q(
+    `SELECT a.file_attachments
+       FROM academy_assignments a
+       JOIN academy_enrollments e
+         ON e.student_id = $1 AND e.course_id = a.course_id
+        AND e.session_id = a.session_id AND e.status IN ('enrolled', 'active')
+      WHERE a.id = $2`,
+    [studentId, assignmentId]
+  );
+  return findStoredCourseFileAttachment(rows[0]?.file_attachments, attachmentId);
 }
 
 async function updateInstructorAssignment(staffId, assignmentId, assignment) {
@@ -2279,7 +2333,11 @@ function mapQuiz(r) {
     opensAt: r.opens_at ? iso(r.opens_at) : null,
     closesAt: r.closes_at ? iso(r.closes_at) : null,
     published: !!r.published,
-    questions: r.questions,
+    attachments: mapCourseFileAttachments(
+      r.attachments,
+      (attachmentId) => quizAttachmentUrl(r.id, attachmentId)
+    ),
+    questions: mapQuizQuestions(r.questions, r.id),
     createdAt: r.created_at ? iso(r.created_at) : null,
   };
 }
@@ -2331,7 +2389,8 @@ async function createInstructorQuiz(staffId, quiz) {
      RETURNING *`,
     [
       id, staffId, quiz.sessionId, quiz.title, quiz.description, quiz.durationMinutes,
-      quiz.maxAttempts, quiz.opensAt, quiz.closesAt, JSON.stringify(quiz.questions),
+      quiz.maxAttempts, quiz.opensAt, quiz.closesAt,
+      JSON.stringify(quiz.questions.map(({ sourceQuestionId, ...question }) => question)),
       quiz.published, quiz.courseId,
     ]
   );
@@ -2339,6 +2398,26 @@ async function createInstructorQuiz(staffId, quiz) {
 }
 
 async function updateInstructorQuiz(staffId, quizId, quiz) {
+  const { rows: currentRows } = await q(
+    `SELECT q.questions
+       FROM academy_quizzes q
+       JOIN academy_courses c ON c.id = q.course_id
+      WHERE q.id = $1 AND q.course_id = $2 AND c.instructor_staff_id = $3
+        AND q.published = false
+        AND NOT EXISTS (
+          SELECT 1 FROM academy_quiz_attempts a WHERE a.quiz_id = q.id
+        )`,
+    [quizId, quiz.courseId, staffId]
+  );
+  if (!currentRows[0]) return null;
+  const currentQuestions = Array.isArray(currentRows[0].questions) ? currentRows[0].questions : [];
+  const questionAttachments = new Map(
+    currentQuestions.map((question) => [question.id, question.attachments || []])
+  );
+  const questions = quiz.questions.map(({ sourceQuestionId, ...question }) => ({
+    ...question,
+    attachments: questionAttachments.get(sourceQuestionId) || [],
+  }));
   const { rows } = await q(
     `UPDATE academy_quizzes q
         SET session_id = $4, title = $5, description = $6,
@@ -2354,10 +2433,107 @@ async function updateInstructorQuiz(staffId, quizId, quiz) {
     [
       quizId, quiz.courseId, staffId, quiz.sessionId, quiz.title, quiz.description,
       quiz.durationMinutes, quiz.maxAttempts, quiz.opensAt, quiz.closesAt,
-      JSON.stringify(quiz.questions),
+      JSON.stringify(questions),
     ]
   );
   return rows[0] ? mapQuiz(rows[0]) : null;
+}
+
+async function addInstructorQuizAttachment(staffId, quizId, questionId, attachment) {
+  if (!questionId) {
+    const { rows } = await q(
+      `UPDATE academy_quizzes q
+          SET attachments = COALESCE(q.attachments, '[]'::jsonb) || $3::jsonb,
+              updated_at = now()
+         FROM academy_courses c
+        WHERE q.id = $1 AND c.id = q.course_id AND c.instructor_staff_id = $2
+       RETURNING q.id`,
+      [quizId, staffId, JSON.stringify([attachment])]
+    );
+    return rows[0] || null;
+  }
+  const { rows } = await q(
+    `UPDATE academy_quizzes q
+        SET questions = (
+              SELECT jsonb_agg(
+                CASE WHEN item.question->>'id' = $3
+                  THEN jsonb_set(
+                    item.question,
+                    '{attachments}',
+                    COALESCE(item.question->'attachments', '[]'::jsonb) || $4::jsonb,
+                    true
+                  )
+                  ELSE item.question
+                END
+                ORDER BY item.ordinality
+              )
+                FROM jsonb_array_elements(q.questions)
+                     WITH ORDINALITY AS item(question, ordinality)
+            ),
+            updated_at = now()
+       FROM academy_courses c
+      WHERE q.id = $1 AND c.id = q.course_id AND c.instructor_staff_id = $2
+        AND EXISTS (
+          SELECT 1 FROM jsonb_array_elements(q.questions) AS item(question)
+           WHERE item.question->>'id' = $3
+        )
+     RETURNING q.id`,
+    [quizId, staffId, questionId, JSON.stringify([attachment])]
+  );
+  return rows[0] || null;
+}
+
+async function getInstructorQuizAttachment(staffId, quizId, attachmentId) {
+  const { rows } = await q(
+    `SELECT q.attachments, q.questions
+       FROM academy_quizzes q
+       JOIN academy_courses c ON c.id = q.course_id
+      WHERE q.id = $1 AND c.instructor_staff_id = $2`,
+    [quizId, staffId]
+  );
+  return findQuizAttachment(rows[0], attachmentId);
+}
+
+async function getStudentQuizAttachment(studentId, quizId, attachmentId) {
+  const { rows } = await q(
+    `SELECT q.attachments, q.questions
+       FROM academy_quizzes q
+       JOIN academy_enrollments e
+         ON e.student_id = $1 AND e.course_id = q.course_id
+        AND e.session_id = q.session_id AND e.status IN ('enrolled', 'active')
+      WHERE q.id = $2 AND q.published = true`,
+    [studentId, quizId]
+  );
+  return findQuizAttachment(rows[0], attachmentId);
+}
+
+function findQuizAttachment(quiz, attachmentId) {
+  if (!quiz) return null;
+  const attachments = [
+    ...(Array.isArray(quiz.attachments) ? quiz.attachments : []),
+    ...(Array.isArray(quiz.questions)
+      ? quiz.questions.flatMap((question) => Array.isArray(question.attachments) ? question.attachments : [])
+      : []),
+  ];
+  return attachments.find((attachment) => attachment?.id === attachmentId) || null;
+}
+
+async function listInstructorQuizAttachmentKeys(staffId, quizId) {
+  const { rows } = await q(
+    `SELECT q.attachments, q.questions
+       FROM academy_quizzes q
+       JOIN academy_courses c ON c.id = q.course_id
+      WHERE q.id = $1 AND c.instructor_staff_id = $2`,
+    [quizId, staffId]
+  );
+  if (!rows[0]) return [];
+  const quiz = rows[0];
+  return [
+    ...(Array.isArray(quiz.attachments) ? quiz.attachments : []),
+    ...(Array.isArray(quiz.questions)
+      ? quiz.questions.flatMap((question) => Array.isArray(question.attachments) ? question.attachments : [])
+      : []),
+  ].map((attachment) => attachment.storageKey).filter(Boolean);
 }
 
 async function setInstructorQuizPublished(staffId, quizId, published) {
@@ -2389,6 +2565,7 @@ async function listStudentQuizzes(studentId, courseId) {
   const { rows } = await q(
     `SELECT q.id, q.course_id, q.session_id, q.title, q.description,
             q.duration_minutes, q.max_attempts, q.opens_at, q.closes_at, q.questions,
+            q.attachments,
             a.id AS attempt_id, a.attempt_number, a.score, a.correct_count,
             a.status AS attempt_status, a.started_at, a.submitted_at, a.answers
        FROM academy_quizzes q
@@ -2414,7 +2591,11 @@ async function listStudentQuizzes(studentId, courseId) {
         maxAttempts: row.max_attempts,
         opensAt: row.opens_at ? iso(row.opens_at) : null,
         closesAt: row.closes_at ? iso(row.closes_at) : null,
-        questions: row.questions,
+        attachments: mapCourseFileAttachments(
+          row.attachments,
+          (attachmentId) => quizAttachmentUrl(row.id, attachmentId)
+        ),
+        questions: mapQuizQuestions(row.questions, row.id),
         attempts: [],
       });
     }
@@ -2751,8 +2932,57 @@ function mapAssignment(r) {
     dueAt: r.due_at,
     maxScore: r.max_score != null ? Number(r.max_score) : 100,
     attachment: r.attachment || '',
+    attachments: mapCourseFileAttachments(
+      r.file_attachments,
+      (attachmentId) => assignmentAttachmentUrl(r.id, attachmentId)
+    ),
     createdAt: iso(r.created_at),
   };
+}
+
+function mapCourseFileAttachment(attachment, downloadUrl) {
+  if (!attachment || typeof attachment.id !== 'string') return null;
+  return {
+    id: attachment.id,
+    fileName: attachment.fileName || '',
+    fileSize: Number(attachment.fileSize) || 0,
+    contentType: attachment.contentType || '',
+    downloadUrl,
+  };
+}
+
+function mapCourseFileAttachments(attachments, downloadUrlFor) {
+  if (!Array.isArray(attachments)) return [];
+  return attachments
+    .map((attachment) => mapCourseFileAttachment(
+      attachment,
+      downloadUrlFor(attachment?.id || '')
+    ))
+    .filter(Boolean);
+}
+
+function assignmentAttachmentUrl(assignmentId, attachmentId) {
+  return `/api/academy/assignments/${encodeURIComponent(assignmentId)}/attachments/${encodeURIComponent(attachmentId)}`;
+}
+
+function quizAttachmentUrl(quizId, attachmentId) {
+  return `/api/academy/quizzes/${encodeURIComponent(quizId)}/attachments/${encodeURIComponent(attachmentId)}`;
+}
+
+function findStoredCourseFileAttachment(attachments, attachmentId) {
+  return Array.isArray(attachments)
+    ? attachments.find((attachment) => attachment?.id === attachmentId) || null
+    : null;
+}
+
+function mapQuizQuestions(questions, quizId) {
+  return (Array.isArray(questions) ? questions : []).map((question) => ({
+    ...question,
+    attachments: mapCourseFileAttachments(
+      question.attachments,
+      (attachmentId) => quizAttachmentUrl(quizId, attachmentId)
+    ),
+  }));
 }
 
 function mapSubmission(r) {
@@ -3730,9 +3960,10 @@ module.exports = {
   getEnrollment, createEnrollment, updateEnrollment, deleteEnrollment,
   // assignments
   listAssignments, getAssignment, createAssignment, updateAssignment, deleteAssignment,
-  listInstructorAssignments, listStudentAssignments,
+  listInstructorAssignments, getInstructorAssignment, listStudentAssignments,
   createInstructorAssignment, updateInstructorAssignment,
-  deleteInstructorAssignment,
+  deleteInstructorAssignment, addInstructorAssignmentAttachment,
+  getInstructorAssignmentAttachment, getStudentAssignmentAttachment,
   // submissions
   listSubmissions, getSubmission, createSubmission, updateSubmission, deleteSubmission,
   saveStudentSubmission, listInstructorSubmissions, updateInstructorSubmission,
@@ -3748,6 +3979,8 @@ module.exports = {
   getInstructorLessonMaterial, getStudentLessonMaterial,
   listInstructorLessonMaterialKeys, deleteInstructorLessonMaterial,
   listInstructorQuizzes, createInstructorQuiz, updateInstructorQuiz, setInstructorQuizPublished,
+  addInstructorQuizAttachment, getInstructorQuizAttachment, getStudentQuizAttachment,
+  listInstructorQuizAttachmentKeys,
   listStudentQuizzes, startStudentQuizAttempt, saveStudentQuizAnswers,
   submitStudentQuizAttempt, listStudentQuizResults,
   // timetable

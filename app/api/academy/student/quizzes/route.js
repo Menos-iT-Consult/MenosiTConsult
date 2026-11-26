@@ -37,7 +37,7 @@ export async function GET(request) {
     const quizzes = await academy.listStudentQuizzes(student.id, courseId);
     return NextResponse.json(quizzes.map((quiz) => ({
       ...quiz,
-      questions: quiz.questions?.map(publicQuizQuestion),
+      questions: quiz.questions?.map((question) => publicQuizQuestion(question, quiz.id)),
     })));
   } catch (error) {
     const noDb = noDbErrorResponse(error);
@@ -69,7 +69,7 @@ export async function POST(request) {
       return NextResponse.json({
         attempt,
         deadline: new Date(deadline).toISOString(),
-        questions: quiz.questions.map(publicQuizQuestion),
+        questions: quiz.questions.map((question) => publicQuizQuestion(question, quiz.id)),
       }, { status: 201 });
     }
     if (body.action === 'save' || body.action === 'submit') {

@@ -6,10 +6,11 @@ const staffAuth = require('../../../../../../../lib/academy-staff');
 const { noDbErrorResponse } = require('../../../../../../../lib/api-helpers');
 const {
   normalizeMaterialLink,
-  validateCourseMaterialFile,
 } = require('../../../../../../../lib/academy-content');
-
-const MAX_FILE_SIZE = 4 * 1024 * 1024;
+const {
+  AcademyFileUploadError,
+  finalizePrivateAcademyCourseFile,
+} = require('../../../../../../../lib/academy-course-file-upload');
 
 export async function GET(request, { params }) {
   try {
@@ -32,59 +33,39 @@ export async function POST(request, { params }) {
     const gate = await staffAuth.requireInstructor(request);
     if (gate.error) return NextResponse.json({ error: gate.error }, { status: gate.status });
     const { id } = await params;
-    const contentType = request.headers.get('content-type') || '';
-    let material;
+    const body = await request.json().catch(() => null);
+    const courseId = typeof body?.courseId === 'string' ? body.courseId.trim() : '';
+    if (!courseId) {
+      return NextResponse.json({ error: 'A course is required.' }, { status: 400 });
+    }
+    const courseGate = await staffAuth.requireAssignedCourse(request, courseId);
+    if (courseGate.error) return NextResponse.json({ error: courseGate.error }, { status: courseGate.status });
 
-    if (contentType.includes('application/json')) {
-      const body = await request.json().catch(() => null);
-      const link = normalizeMaterialLink(body?.title, body?.url);
-      if (!link || typeof body?.courseId !== 'string' || !body.courseId.trim()) {
-        return NextResponse.json({ error: 'Provide a title and valid HTTPS link.' }, { status: 400 });
+    let material;
+    if (typeof body.uploadKey === 'string') {
+      const title = typeof body.title === 'string' ? body.title.trim() : '';
+      if (title.length > 160 || typeof body.fileName !== 'string') {
+        return NextResponse.json({ error: 'Provide a valid file name and a title of 160 characters or fewer.' }, { status: 400 });
       }
-      const courseGate = await staffAuth.requireAssignedCourse(request, body.courseId);
-      if (courseGate.error) return NextResponse.json({ error: courseGate.error }, { status: courseGate.status });
-      material = { ...link, courseId: body.courseId };
-    } else {
-      const contentLength = Number(request.headers.get('content-length') || 0);
-      if (contentLength > MAX_FILE_SIZE + 65536) {
-        return NextResponse.json({ error: 'Course files must be 4 MB or smaller.' }, { status: 413 });
-      }
-      const form = await request.formData();
-      const courseId = String(form.get('courseId') || '');
-      const file = form.get('file');
-      const title = String(form.get('title') || '').trim();
-      if (!courseId || !file || typeof file.arrayBuffer !== 'function') {
-        return NextResponse.json({ error: 'Select a course file to upload.' }, { status: 400 });
-      }
-      if (title.length > 160) {
-        return NextResponse.json({ error: 'Material title must be 160 characters or fewer.' }, { status: 400 });
-      }
-      const courseGate = await staffAuth.requireAssignedCourse(request, courseId);
-      if (courseGate.error) return NextResponse.json({ error: courseGate.error }, { status: courseGate.status });
-      if (file.size > MAX_FILE_SIZE) {
-        return NextResponse.json({ error: 'Course files must be 4 MB or smaller.' }, { status: 413 });
-      }
-      if (!storage.certificateStorageEnabled()) {
-        return NextResponse.json({ error: 'Private Academy course-file storage is not configured.' }, { status: 503 });
-      }
-      const bytes = Buffer.from(await file.arrayBuffer());
-      const fileInfo = validateCourseMaterialFile(file.name, file.type, bytes);
-      if (!fileInfo) {
-        return NextResponse.json({
-          error: 'Upload a valid PDF, TXT, DOCX, PPTX, or XLSX file with a matching extension.',
-        }, { status: 400 });
-      }
-      const savedFile = await storage.putPrivateCourseMaterial(bytes, fileInfo.mime);
-      uploadedKey = savedFile.key;
+      const { attachment, uploadedKey: key } = await finalizePrivateAcademyCourseFile(
+        body.uploadKey,
+        body.fileName,
+        academy.newId('aclm')
+      );
+      uploadedKey = key;
       material = {
         kind: 'file',
         courseId,
-        title: title || fileInfo.fileName,
-        fileName: fileInfo.fileName,
-        storageKey: savedFile.key,
-        contentType: fileInfo.mime,
-        fileSize: savedFile.size,
+        title: title || attachment.fileName,
+        fileName: attachment.fileName,
+        storageKey: attachment.storageKey,
+        contentType: attachment.contentType,
+        fileSize: attachment.fileSize,
       };
+    } else {
+      const link = normalizeMaterialLink(body.title, body.url);
+      if (!link) return NextResponse.json({ error: 'Provide a title and valid HTTPS link.' }, { status: 400 });
+      material = { ...link, courseId };
     }
 
     const created = await academy.createInstructorLessonMaterial(gate.staff.id, id, material);
@@ -99,6 +80,9 @@ export async function POST(request, { params }) {
         await storage.deletePrivateCourseMaterial(uploadedKey);
       } catch (cleanupError) {
         console.error('Academy course material cleanup error:', cleanupError);
+      }
+      if (error instanceof AcademyFileUploadError) {
+        return NextResponse.json({ error: error.message }, { status: error.status });
       }
     }
     const noDb = noDbErrorResponse(error);
