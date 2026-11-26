@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 export default function AcademyInstructorAdminPage() {
@@ -20,6 +21,11 @@ export default function AcademyInstructorAdminPage() {
     name: '', startDate: '', endDate: '', isCurrent: true,
   });
   const [selectedCourses, setSelectedCourses] = useState({});
+  const [rosterCourseId, setRosterCourseId] = useState('');
+  const [rosterSessionId, setRosterSessionId] = useState('');
+  const [roster, setRoster] = useState([]);
+  const [rosterLoading, setRosterLoading] = useState(false);
+  const [rosterError, setRosterError] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState('');
   const [error, setError] = useState('');
@@ -54,6 +60,10 @@ export default function AcademyInstructorAdminPage() {
       const sessionsResult = await sessionsResponse.json();
       if (!sessionsResponse.ok) throw new Error(sessionsResult.error || 'Could not load Academy sessions.');
       setSessions(sessionsResult);
+      setRosterCourseId((current) => current || coursesResult.courses[0]?.id || '');
+      setRosterSessionId((current) => current || (
+        sessionsResult.find((session) => session.is_current)?.id || sessionsResult[0]?.id || ''
+      ));
       setSelectedCourses(Object.fromEntries(
         staffResult
           .filter((member) => member.role === 'instructor')
@@ -72,6 +82,42 @@ export default function AcademyInstructorAdminPage() {
   }, [router]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!rosterCourseId || !rosterSessionId) {
+      setRoster([]);
+      setRosterLoading(false);
+      setRosterError('');
+      return undefined;
+    }
+
+    let active = true;
+    async function loadRoster() {
+      setRosterLoading(true);
+      setRosterError('');
+      setRoster([]);
+      try {
+        const response = await fetch(
+          `/api/academy/admin/courses/${encodeURIComponent(rosterCourseId)}/students?sessionId=${encodeURIComponent(rosterSessionId)}`,
+          { credentials: 'include', cache: 'no-store' }
+        );
+        const result = await response.json();
+        if (response.status === 401 || response.status === 403) {
+          router.replace('/academy/admin/login');
+          return;
+        }
+        if (!response.ok) throw new Error(result.error || 'Could not load enrolled students.');
+        if (active) setRoster(result.students || []);
+      } catch (loadError) {
+        if (active) setRosterError(loadError.message || 'Could not load enrolled students.');
+      } finally {
+        if (active) setRosterLoading(false);
+      }
+    }
+
+    loadRoster();
+    return () => { active = false; };
+  }, [rosterCourseId, rosterSessionId, router]);
 
   async function createInstructor(event) {
     event.preventDefault();
@@ -296,6 +342,77 @@ export default function AcademyInstructorAdminPage() {
               {saving === 'course' ? 'Creating…' : 'Create course'}
             </button>
           </form>
+        </section>
+
+        <section className="ap-section">
+          <div className="ap-card-heading">
+            <div>
+              <h2>Course enrolments</h2>
+              <p className="ap-muted">View active students enrolled in a course for an academic session.</p>
+            </div>
+            <span className="ap-muted">{roster.length} enrolled</span>
+          </div>
+          <div className="ap-form-grid">
+            <label>Course
+              <select
+                className="ap-select"
+                value={rosterCourseId}
+                onChange={(event) => setRosterCourseId(event.target.value)}
+                disabled={!courses.length}
+              >
+                <option value="">Choose a course</option>
+                {courses.map((course) => (
+                  <option key={course.id} value={course.id}>
+                    {course.code ? `${course.code} · ` : ''}{course.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>Academic session
+              <select
+                className="ap-select"
+                value={rosterSessionId}
+                onChange={(event) => setRosterSessionId(event.target.value)}
+                disabled={!sessions.length}
+              >
+                <option value="">Choose a session</option>
+                {sessions.map((session) => (
+                  <option key={session.id} value={session.id}>
+                    {session.name}{session.is_current ? ' (current)' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {rosterError && <div className="ap-error" role="alert">{rosterError}</div>}
+          {rosterLoading ? <p>Loading enrolled students…</p> : roster.length ? (
+            <div className="ap-table-wrap ap-card">
+              <table className="ap-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Student ID</th>
+                    <th scope="col">Name</th>
+                    <th scope="col">Email</th>
+                    <th scope="col">Phone</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {roster.map((student) => (
+                    <tr key={student.id}>
+                      <td><Link href={`/academy/admin/students/${encodeURIComponent(student.id)}`}>{student.studentId || 'Not assigned'}</Link></td>
+                      <td>{student.name}</td>
+                      <td>{student.email || '—'}</td>
+                      <td>{student.phone || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : !rosterError && courses.length && sessions.length ? (
+            <div className="ap-card ap-empty"><p>No active students are enrolled in this course for the selected session.</p></div>
+          ) : !courses.length || !sessions.length ? (
+            <p className="ap-muted">Create a course and academic session to view enrolments.</p>
+          ) : null}
         </section>
 
         <section className="ap-card ap-section">
