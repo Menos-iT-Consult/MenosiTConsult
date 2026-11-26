@@ -14,7 +14,7 @@ export async function POST(request, { params }) {
   try {
     const gate = await staffAuth.requireInstructor(request);
     if (gate.error) return NextResponse.json({ error: gate.error }, { status: gate.status });
-    const { assignmentId } = await params;
+    const { id: assignmentId } = await params;
     const assignment = await academy.getInstructorAssignment(gate.staff.id, assignmentId);
     if (!assignment) {
       return NextResponse.json({ error: 'Assignment not found in your courses.' }, { status: 404 });
