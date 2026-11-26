@@ -145,6 +145,21 @@
   color: #64748b;
 }
 
+.ap-sidebar-badge {
+  display: grid;
+  min-width: 21px;
+  height: 21px;
+  margin-left: auto;
+  padding: 0 6px;
+  place-items: center;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: .7rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .ap-sidebar-svg { display: block; width: 19px; height: 19px; }
 .ap-sidebar-link.is-active .ap-sidebar-icon { background: #fff; color: var(--blue); }
 .ap-sidebar-bottom { display: grid; gap: 8px; margin-top: auto; padding-top: 18px; }

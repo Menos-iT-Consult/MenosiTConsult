@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useStudentNotificationContext } from '../../PortalShell';
 
 function formatDate(value) {
   const date = new Date(value);
@@ -11,6 +12,7 @@ function formatDate(value) {
 
 export default function StudentNotificationsPage() {
   const router = useRouter();
+  const { setUnreadCount } = useStudentNotificationContext();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -27,13 +29,15 @@ export default function StudentNotificationsPage() {
         return;
       }
       if (!response.ok) throw new Error(result.error || 'Could not load notifications.');
-      setNotifications(result.notifications || []);
+      const nextNotifications = result.notifications || [];
+      setNotifications(nextNotifications);
+      setUnreadCount(result.unreadCount);
     } catch (loadError) {
       setError(loadError.message || 'Could not load notifications.');
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [router, setUnreadCount]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -49,9 +53,13 @@ export default function StudentNotificationsPage() {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Could not update notifications.');
+      const wasUnread = id && notifications.some((item) => item.id === id && !item.isRead);
       setNotifications((current) => current.map((item) =>
         !id || item.id === id ? { ...item, isRead: true } : item
       ));
+      setUnreadCount((current) => id
+        ? Math.max(0, (current || 0) - (wasUnread ? 1 : 0))
+        : 0);
     } catch (saveError) {
       setError(saveError.message || 'Could not update notifications.');
     } finally {

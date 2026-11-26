@@ -1,8 +1,16 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+
+const StudentNotificationContext = createContext(null);
+
+export function useStudentNotificationContext() {
+  const context = useContext(StudentNotificationContext);
+  if (!context) throw new Error('Student notification context is not available.');
+  return context;
+}
 
 const PORTALS = {
   student: {
@@ -206,6 +214,7 @@ export default function PortalShell({ portal, children }) {
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeHash, setActiveHash] = useState('');
+  const [unreadCount, setUnreadCount] = useState(null);
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState('');
   const menuButtonRef = useRef(null);
@@ -217,6 +226,32 @@ export default function PortalShell({ portal, children }) {
     window.addEventListener('hashchange', updateHash);
     return () => window.removeEventListener('hashchange', updateHash);
   }, []);
+
+  useEffect(() => {
+    if (portal !== 'student' || pathname === '/academy/notifications') return undefined;
+    let active = true;
+
+    async function loadUnreadCount() {
+      try {
+        const response = await fetch('/api/academy/student/notifications?countOnly=true', { credentials: 'include' });
+        if (response.status === 401) {
+          if (active) setUnreadCount(null);
+          return;
+        }
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Could not load unread notifications.');
+        if (typeof result.unreadCount !== 'number' || !Number.isInteger(result.unreadCount)) {
+          throw new Error('The unread notification count was invalid.');
+        }
+        if (active) setUnreadCount(result.unreadCount);
+      } catch (loadError) {
+        if (active) console.error('Academy unread notification count error:', loadError);
+      }
+    }
+
+    loadUnreadCount();
+    return () => { active = false; };
+  }, [pathname, portal]);
 
   useEffect(() => {
     if (!mobileOpen) return undefined;
@@ -288,7 +323,8 @@ export default function PortalShell({ portal, children }) {
   }
 
   return (
-    <div className={`ap ap-shell ap-shell-${portal}${mobileOpen ? ' is-mobile-open' : ''}`}>
+    <StudentNotificationContext.Provider value={{ unreadCount, setUnreadCount }}>
+      <div className={`ap ap-shell ap-shell-${portal}${mobileOpen ? ' is-mobile-open' : ''}`}>
       <button
         className="ap-sidebar-scrim"
         type="button"
@@ -332,10 +368,16 @@ export default function PortalShell({ portal, children }) {
                 href={link.href}
                 className={`ap-sidebar-link${active ? ' is-active' : ''}`}
                 aria-current={active ? 'page' : undefined}
+                aria-label={portal === 'student' && link.href === '/academy/notifications' && unreadCount > 0
+                  ? `${link.label}, ${unreadCount} unread`
+                  : undefined}
                 onClick={closeMobileMenu}
               >
                 <span className="ap-sidebar-icon"><NavigationIcon name={link.icon} /></span>
                 <span className="ap-sidebar-label">{link.label}</span>
+                {portal === 'student' && link.href === '/academy/notifications' && unreadCount > 0 && (
+                  <span className="ap-sidebar-badge" aria-hidden="true">{unreadCount}</span>
+                )}
               </Link>
             );
             return (
@@ -405,6 +447,7 @@ export default function PortalShell({ portal, children }) {
         </header>
         {children}
       </div>
-    </div>
+      </div>
+    </StudentNotificationContext.Provider>
   );
 }

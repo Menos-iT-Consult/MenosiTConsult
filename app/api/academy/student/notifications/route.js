@@ -12,10 +12,14 @@ export async function GET(request) {
     if (!student || student.status !== 'active') {
       return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
     }
+    const unreadCount = await academy.countUnreadStudentPortalNotifications(student.id);
+    if (new URL(request.url).searchParams.get('countOnly') === 'true') {
+      return NextResponse.json({ unreadCount }, { headers: { 'Cache-Control': 'private, no-store' } });
+    }
     const notifications = await academy.listStudentPortalNotifications(student.id, 200);
     return NextResponse.json({
       notifications,
-      unreadCount: notifications.filter((notification) => !notification.isRead).length,
+      unreadCount,
     }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
     const noDb = noDbErrorResponse(error);
